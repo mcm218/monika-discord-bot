@@ -31,7 +31,7 @@ const loop = [];
 // 2 - song looping
 const shuffleMode = [];
 var serverVolumes = new Map();
-const youtubeKey = auth.youtubeKey;
+const youtubeKey = [];
 
 // Configure logger settings
 logger.remove(logger.transports.Console);
@@ -50,6 +50,7 @@ bot.on("ready", () => {
   logger.info(bot.user.tag);
   loop.push(0);
   shuffleMode.push(false);
+  youtubeKey.push(auth.youtubeKey);
 });
 
 // Log bot in using token
@@ -212,7 +213,7 @@ async function searchSong(message, serverQueue) {
       // Search Youtube for video
       service.search.list(
         {
-          auth: youtubeKey,
+          auth: youtubeKey[0],
           part: "snippet",
           type: "video",
           maxResults: maxResults,
@@ -222,7 +223,7 @@ async function searchSong(message, serverQueue) {
           if (err) {
             console.log(err);
             if (err.code == 403 || err.code == 429) {
-              youtubeKey = auth.backupKey;
+              youtubeKey[0] = auth.backupKey;
               message.channel.send(
                 "Quota reached, switching to backup key...\n Try again!"
               );
@@ -364,7 +365,7 @@ async function addSong(message, serverQueue) {
         var service = google.youtube("v3");
         service.playlistItems.list(
           {
-            auth: youtubeKey,
+            auth: youtubeKey[0],
             maxResults: 50,
             part: "snippet",
             playlistId: id
@@ -373,7 +374,7 @@ async function addSong(message, serverQueue) {
             if (err) {
               console.log(err);
               if (err.code == 403 || err.code == 429) {
-                youtubeKey = auth.backupKey;
+                youtubeKey[0] = auth.backupKey;
                 message.channel.send(
                   "Quota reached, switching to backup key...\n Try again!"
                 );
@@ -414,7 +415,7 @@ async function addSong(message, serverQueue) {
       } else {
         service.search.list(
           {
-            auth: youtubeKey,
+            auth: youtubeKey[0],
             type: "playlist",
             maxResults: 1,
             part: "snippet",
@@ -424,7 +425,7 @@ async function addSong(message, serverQueue) {
             if (err) {
               console.log(err);
               if (err.code == 403 || err.code == 429) {
-                youtubeKey = auth.backupKey;
+                youtubeKey[0] = auth.backupKey;
                 message.channel.send(
                   "Quota reached, switching to backup key...\n Try again!"
                 );
@@ -439,7 +440,7 @@ async function addSong(message, serverQueue) {
             var id = results.id.playlistId;
             service.playlistItems.list(
               {
-                auth: youtubeKey,
+                auth: youtubeKey[0],
                 maxResults: 50,
                 part: "snippet",
                 playlistId: id
@@ -448,7 +449,7 @@ async function addSong(message, serverQueue) {
                 if (err) {
                   console.log(err);
                   if (err.code == 403 || err.code == 429) {
-                    youtubeKey = auth.backupKey;
+                    youtubeKey[0] = auth.backupKey;
                     message.channel.send(
                       "Quota reached, switching to backup key...\n Try again!"
                     );
@@ -513,7 +514,7 @@ async function addSong(message, serverQueue) {
         // Search Youtube for video
         service.search.list(
           {
-            auth: youtubeKey,
+            auth: youtubeKey[0],
             type: "video",
             maxResults: 5,
             part: "snippet",
@@ -523,7 +524,7 @@ async function addSong(message, serverQueue) {
             if (err) {
               console.log(err);
               if (err.code == 403 || err.code == 429) {
-                youtubeKey = auth.backupKey;
+                youtubeKey[0] = auth.backupKey;
                 message.channel.send(
                   "Quota reached, switching to backup key...\n Try again!"
                 );
