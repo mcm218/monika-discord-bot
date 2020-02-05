@@ -3,6 +3,7 @@ const display = require("./music/display");
 const queueController = require("./music/queue_control");
 const validUrl = require("./validUrl");
 const printCommands = require("./printCommands");
+const copypastas = require("./copypastas");
 const Discord = require("discord.js");
 const logger = require("winston");
 const auth = require("./auth.json");
@@ -146,6 +147,25 @@ bot.on("message", (message) => {
         message.content.match(/bestgirl/i)
       ) {
         message.channel.send("<:JustMonika:664559827342852101>");
+      } else if (message.content.match(/dnd/i)) {
+        const index = Math.floor(Math.random() * 3);
+        switch (index) {
+          case 0:
+            message.channel.send(copypastas.ankles);
+            break;
+          case 1:
+            message.channel.send(copypastas.dva);
+            break;
+          case 2:
+            message.channel.send(copypastas.delete);
+            break;
+        }
+      } else if (message.content.match(/ankles/i)) {
+        message.channel.send(copypastas.ankles);
+      } else if (message.content.match(/dva|d.va/i)) {
+        message.channel.send(copypastas.dva);
+      } else if (message.content.match(/delete/i)) {
+        message.channel.send(copypastas.delete);
       }
     }
   } catch (err) {
@@ -240,7 +260,7 @@ async function selectSong(message, serverQueue) {
 
     if (!voiceChannel)
       return message.channel.send(
-        "You need to be in a voice channel to play music!"
+        "You need to be in a voice channel to add music!"
       );
     const permissions = voiceChannel.permissionsFor(message.client.user);
     if (!permissions.has("CONNECT") || !permissions.has("SPEAK")) {
