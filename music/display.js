@@ -27,11 +27,12 @@ function nextSong(message, serverQueue) {
 }
 function listSongs(message, serverQueue) {
   var i = 0;
-  var formattedList = "";
+  var formattedList = "```";
   for (let song of serverQueue.songs) {
     formattedList += `${i} - ${song.title}\n`;
     i++;
   }
+  formattedList += "```"
   message.channel.send(formattedList);
 }
 

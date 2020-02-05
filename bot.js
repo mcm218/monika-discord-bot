@@ -24,6 +24,7 @@ firebase.initializeApp(firebaseConfig);
 let db = firebase.firestore();
 
 const queue = new Map();
+const observers = new Map();
 var searchList = [];
 const loop = [];
 // 0 - no looping
@@ -42,6 +43,20 @@ logger.add(new logger.transports.Console(), {
 logger.level = "debug";
 // Initialize Discord Bot
 var bot = new Discord.Client();
+// Update DB whenever user joins/leaves VC
+bot.on("voiceStateUpdate", (oldMember, newMember) => {
+  if (newMember.voiceChannel) {
+    console.log(newMember.displayName + " has joined the VC!");
+    db.collection("guilds/" + newMember.voiceChannel.guild.id + "/VC")
+      .doc(newMember.id)
+      .set({ id: newMember.id, displayName: newMember.displayName });
+  } else {
+    console.log(oldMember.displayName + " has left the VC...");
+    db.collection("guilds/" + oldMember.voiceChannel.guild.id + "/VC")
+      .doc(oldMember.id)
+      .delete();
+  }
+});
 
 // When bot is ready, print to console
 bot.on("ready", () => {
@@ -60,6 +75,83 @@ bot.on("message", (message) => {
   if (message.author.bot) return; // Prevents bot from activating its self
   try {
     const serverQueue = queue.get(message.guild.id);
+    const docRef = db
+      .collection("guilds/" + message.guild.id + "/VC/")
+      .doc("queue");
+    var serverObserver = observers.get(message.guild.id);
+    if (!serverObserver) {
+      serverObserver = docRef.onSnapshot((doc) => {
+        try {
+          const serverQueue = queue.get(message.guild.id);
+          const dbQueue = doc.data() ? doc.data().queue : [];
+          if (serverQueue) {
+            var songShift = true;
+            var i = 0;
+            // checks if song is missing from db
+            for (let a of serverQueue.songs) {
+              var found = false;
+              for (let b of dbQueue) {
+                if (a.id == b.id) {
+                  found = true;
+                  break;
+                }
+              }
+              if (!found) {
+                var removed = serverQueue.songs.splice(i, 1)[0];
+                console.log(removed);
+                message.channel.send("Removed " + removed.title);
+                songShift = false;
+              } else {
+                i++;
+              }
+            }
+            i = 0;
+            //checks if song is missing from server
+            for (let b of dbQueue) {
+              var found = false;
+              for (let a of serverQueue.songs) {
+                if (a.id == b.id) {
+                  found = true;
+                  break;
+                }
+              }
+              if (!found) {
+                serverQueue.songs.splice(i, 0, b);
+                message.channel.send(
+                  `${i} - ${b.title} has been added to the queue!`
+                );
+                songShift = false;
+              } else {
+                i++;
+              }
+            }
+            if (songShift) {
+              serverQueue.songs = dbQueue;
+            }
+            queue.set(message.guild.id, serverQueue);
+          }
+        } catch (err) {
+          console.error(err);
+        }
+
+        // if (
+        //   serverQueue &&
+        //   serverQueue.songs &&
+        //   serverQueue.songs.length > doc.data().queue.length
+        // ) {
+        //   // find differences
+        //   serverQueue
+        //   // remove something
+        // } else if (
+        //   serverQueue &&
+        //   serverQueue.songs &&
+        //   serverQueue.songs.length < doc.data().queue.length
+        // ) {
+        //   // add something
+        // }
+      });
+      observers.set(message.guild.id, serverObserver);
+    }
     var volume = serverVolumes.get(message.guild.id);
     if (!volume) {
       serverVolumes.set(message.guild.id, 7);
@@ -197,14 +289,14 @@ async function searchSong(message, serverQueue) {
         if (snapshots.docs[0]) id = snapshots.docs[0].data().id.videoId;
       });
     if (id) {
-      console.log("Skipped search!");
       var songs = [];
       for (let doc of docs) {
         const url = "https://www.youtube.com/watch?v=" + doc.data().id.videoId;
         const songInfo = await ytdl.getInfo(url);
         songs.push({
           title: songInfo.title,
-          url: songInfo.video_url
+          url: songInfo.video_url,
+          id: doc.data().id.videoId
         });
       }
       searchList = songs;
@@ -241,7 +333,8 @@ async function searchSong(message, serverQueue) {
             const songInfo = await ytdl.getInfo(url);
             songs.push({
               title: songInfo.title,
-              url: songInfo.video_url
+              url: songInfo.video_url,
+              id: results[i].id.videoId
             });
           }
           searchList = songs;
@@ -316,6 +409,9 @@ async function selectSong(message, serverQueue) {
         serverQueue.songs.push(song);
       }
       var num = !serverQueue ? 0 : serverQueue.songs.length - 1;
+      db.collection("guilds/" + message.guild.id + "/VC")
+        .doc("queue")
+        .set({ queue: serverQueue.songs });
       return message.channel.send(
         `${num} - ${song.title} has been added to the queue!`
       );
@@ -361,7 +457,6 @@ async function addSong(message, serverQueue) {
           if (snapshots.docs[0]) id = snapshots.docs[0].data().id.playlistId;
         });
       if (id) {
-        console.log("Skipped search!");
         var service = google.youtube("v3");
         service.playlistItems.list(
           {
@@ -505,7 +600,6 @@ async function addSong(message, serverQueue) {
           if (snapshots.docs[0]) id = snapshots.docs[0].data().id.videoId;
         });
       if (id) {
-        console.log("Skipped search!");
         var url = "https://www.youtube.com/watch?v=" + id;
         return message.channel.send(
           await addSongToQueue(url, message, serverQueue, voiceChannel)
@@ -559,9 +653,15 @@ async function addSong(message, serverQueue) {
 
 async function addSongToQueue(videoUrl, message, serverQueue, voiceChannel) {
   const songInfo = await ytdl.getInfo(videoUrl);
+  var thumbnail =
+    songInfo.player_response.videoDetails.thumbnail.thumbnails[
+      songInfo.player_response.videoDetails.thumbnail.thumbnails.length - 1
+    ];
   const song = {
     title: songInfo.title,
-    url: songInfo.video_url
+    url: songInfo.video_url,
+    id: songInfo.video_id,
+    thumbnail: thumbnail
   };
   if (!serverQueue) {
     // Creating the contract for our queue
@@ -598,6 +698,9 @@ async function addSongToQueue(videoUrl, message, serverQueue, voiceChannel) {
     } else {
       serverQueue.songs.push(song);
     }
+    db.collection("guilds/" + message.guild.id + "/VC")
+      .doc("queue")
+      .set({ queue: serverQueue.songs });
   }
   var num = !serverQueue ? 0 : serverQueue.songs.length - 1;
   return `${num} - ${song.title} has been added to the queue!`;
@@ -608,13 +711,18 @@ function playSong(message, song) {
   if (!song) {
     serverQueue.voiceChannel.leave();
     queue.delete(message.guild.id);
+    db.collection("guilds/" + message.guild.id + "/VC")
+      .doc("queue")
+      .set({ queue: [] });
+    message.channel.send("Bye!");
     return;
   }
-  console.log(song.title);
+  db.collection("guilds/" + message.guild.id + "/VC")
+    .doc("queue")
+    .set({ queue: serverQueue.songs });
   const dispatcher = serverQueue.connection
     .playStream(ytdl(song.url))
     .on("end", () => {
-      console.log("Music ended!");
       switch (loop[0]) {
         case 0: // no looping
           serverQueue.songs.shift();

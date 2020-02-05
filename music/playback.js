@@ -88,7 +88,6 @@ function stopSongs(loop, message, serverQueue) {
       loop = 2;
       break;
   }
-  message.channel.send("Bye!");
 }
 
 function changeVolume(serverVolumes, message, serverQueue) {
