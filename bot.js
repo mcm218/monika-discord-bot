@@ -1,39 +1,23 @@
 const playback = require("./music/playback");
 const display = require("./music/display");
 const queueController = require("./music/queue_control");
-const validUrl = require("./validUrl");
+const admin = require("./music/admin");
+const search = require("./music/search");
+const select = require("./music/select");
+const add = require("./music/add");
+const play = require("./music/play");
+const db = require("./music/database");
 const printCommands = require("./printCommands");
 const copypastas = require("./copypastas");
 const Discord = require("discord.js");
 const logger = require("winston");
 const auth = require("./auth.json");
 const config = require("./config.json");
-const ytdl = require("ytdl-core");
-var { google } = require("googleapis");
 // Firebase App (the core Firebase SDK) is always required and
 // must be listed before other Firebase SDKs
 var firebase = require("firebase/app");
 // Add the Firebase products that you want to use
 require("firebase/firestore");
-
-// Initialize Firebase
-var firebaseConfig = auth.firebaseConfig;
-firebase.initializeApp(firebaseConfig);
-
-let db = firebase.firestore();
-
-const queue = new Map();
-const queueObservers = new Map();
-const controllerObservers = new Map();
-var searchList = [];
-const loop = [];
-// 0 - no looping
-// 1 - queue looping
-// 2 - song looping
-const shuffleMode = [];
-const pauseState = [];
-var serverVolumes = new Map();
-const youtubeKey = [];
 
 // Configure logger settings
 logger.remove(logger.transports.Console);
@@ -49,26 +33,206 @@ bot.on("voiceStateUpdate", (oldMember, newMember) => {
   if (newMember.user.bot) return;
   if (newMember.voiceChannel) {
     console.log(newMember.displayName + " has joined the VC!");
-    db.collection("guilds/" + newMember.voiceChannel.guild.id + "/VC")
-      .doc(newMember.id)
-      .set({ id: newMember.id, displayName: newMember.displayName });
+    db.pushUser(newMember.guild.id, newMember.id, newMember.displayName);
   } else {
     console.log(oldMember.displayName + " has left the VC...");
-    db.collection("guilds/" + oldMember.voiceChannel.guild.id + "/VC")
-      .doc(oldMember.id)
-      .delete();
+    db.popUser(oldMember.guild.id, oldMember.id);
   }
 });
 
 // When bot is ready, print to console
 bot.on("ready", () => {
+  admin.youtubeKey.push(auth.youtubeKey);
+  bot.guilds.forEach((guild) => {
+    const queueRef = db.getQueueRef(guild.id);
+    const controllerRef = db.getControllerRef(guild.id);
+    var queueObserver = admin.queueObservers.get(guild.id);
+    admin.loop.set(guild.id, 0);
+    admin.shuffleMode.set(guild.id, false);
+    admin.pauseState.set(guild.id, false);
+    var musicChannel;
+    var voiceChannel;
+    guild.channels.forEach((channel) => {
+      if (channel.name == "music" && channel.type == "text") {
+        musicChannel = channel;
+      }
+      if (channel.type == "voice") {
+        voiceChannel = channel;
+      }
+    });
+
+    if (!queueObserver) {
+      queueObserver = queueRef.onSnapshot(async (doc) => {
+        try {
+          var serverQueue = admin.queue.get(guild.id);
+          if (!serverQueue) {
+            const queueContruct = {
+              textChannel: musicChannel,
+              voiceChannel: voiceChannel,
+              connection: null,
+              songs: [],
+              volume: 5,
+              playing: true
+            };
+            // Setting the queue using our contract
+            serverQueue = queueContruct;
+            try {
+              // Here we try to join the voicechat and save our connection into our object.
+              var connection = await voiceChannel.join();
+              queueContruct.connection = connection;
+            } catch (err) {
+              // Printing the error message if the bot fails to join the voicechat
+              console.log(err);
+            }
+          }
+          const dbQueue = doc.data() ? doc.data().queue : [];
+          var songShift = true;
+          var i = 0;
+          // checks if song is missing from db (need to remove)
+          for (let a of serverQueue.songs) {
+            var found = false;
+            for (let b of dbQueue) {
+              if (a.id == b.id) {
+                found = true;
+                break;
+              }
+            }
+            if (!found) {
+              if (i == 0) {
+                if (serverQueue) {
+                  if (admin.loop.get(guild.id) == 2) {
+                    admin.loop.set(guild.id, 1);
+                  }
+                  serverQueue.connection.dispatcher.end();
+                  if (serverQueue.connection.dispatcher) {
+                    serverQueue.connection.dispatcher.setVolumeLogarithmic(
+                      admin.serverVolumes.get(guild.id) / 50
+                    );
+                  }
+                }
+              } else {
+                var removed = serverQueue.songs.splice(i, 1)[0];
+                console.log(removed);
+              }
+              songShift = false;
+            } else {
+              i++;
+            }
+          }
+          //checks if song is missing from server (need to add)
+          for (let b of dbQueue) {
+            i = 0;
+            var found = false;
+            for (let a of serverQueue.songs) {
+              if (a.id == b.id) {
+                found = true;
+                break;
+              }
+              i++;
+            }
+            if (!found) {
+              serverQueue.songs.splice(i, 0, b);
+              songShift = false;
+            }
+          }
+          if (songShift) {
+            serverQueue.songs = dbQueue;
+          }
+          if (!admin.queue.get(guild.id)) {
+            // Calling the play function to start a song
+            play.dbPlaySong(musicChannel, serverQueue);
+          }
+          admin.queue.set(guild.id, serverQueue);
+        } catch (err) {
+          console.error(err);
+        }
+      });
+      admin.queueObservers.set(guild.id, queueObserver);
+    }
+
+    var volume = admin.serverVolumes.get(guild.id);
+    if (!volume) {
+      admin.serverVolumes.set(guild.id, 7);
+      volume = 7;
+    }
+
+    var controllerObserver = admin.controllerObservers.get(guild.id);
+    if (!controllerObserver) {
+      controllerObserver = controllerRef.onSnapshot((doc) => {
+        try {
+          const dbController = doc.data();
+          const id = guild.id;
+          const serverQueue = admin.queue.get(id);
+          var volume = admin.serverVolumes.get(id);
+          if (dbController) {
+            //check for differences
+            if (dbController.volume != volume) {
+              volume = dbController.volume;
+              admin.serverVolumes.set(guild.id, volume);
+              if (serverQueue && serverQueue.connection) {
+                const dispatcher = serverQueue.connection.dispatcher;
+                dispatcher.setVolumeLogarithmic(volume / 50);
+                musicChannel.send("Volume: " + volume);
+              }
+            }
+            if (dbController.shuffleMode != admin.shuffleMode.get(guild.id)) {
+              admin.shuffleMode.set(guild.id, dbController.shuffleMode);
+              if (admin.shuffleMode.get(guild.id)) {
+                musicChannel.send("Now in shuffle mode!");
+              } else {
+                musicChannel.send("No longer in shuffle mode.... :frowning:");
+              }
+            }
+            if (dbController.loop != admin.loop.get(guild.id)) {
+              var loop = dbController.loop;
+              admin.loop.set(guild.id, loop);
+              switch (loop) {
+                case 0:
+                  musicChannel.send("No longer looping!");
+                  break;
+                case 1:
+                  musicChannel.send("Now looping queue!");
+                  break;
+                case 2:
+                  musicChannel.send("Now looping song!");
+                  break;
+              }
+            }
+            if (dbController.pauseState != admin.pauseState.get(guild.id)) {
+              if (dbController.pauseState) {
+                if (serverQueue.connection) {
+                  admin.pauseState.set(guild.id, true);
+                  serverQueue.connection.dispatcher.pause();
+                  musicChannel.send("Paused!");
+                }
+              } else {
+                if (serverQueue.connection) {
+                  admin.pauseState.set(guild.id, false);
+                  serverQueue.connection.dispatcher.resume();
+                  musicChannel.send("Resuming!");
+                }
+              }
+            }
+          } else {
+            //upload controller
+            controllerRef.set({
+              volume: admin.serverVolumes.get(guild.id),
+              shuffleMode: admin.shuffleMode.get(guild.id),
+              loop: admin.loop.get(guild.id),
+              pauseState: false
+            });
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      });
+      admin.controllerObservers.set(guild.id, controllerObserver);
+    }
+  });
+
   logger.info("Connected");
   logger.info("Logged in as: ");
   logger.info(bot.user.tag);
-  loop.push(0);
-  shuffleMode.push(false);
-  pauseState.push(false);
-  youtubeKey.push(auth.youtubeKey);
 });
 
 // Log bot in using token
@@ -77,148 +241,7 @@ bot.login(auth.token);
 bot.on("message", (message) => {
   if (message.author.bot) return; // Prevents bot from activating its self
   try {
-    const serverQueue = queue.get(message.guild.id);
-    const queueRef = db
-      .collection("guilds/" + message.guild.id + "/VC/")
-      .doc("queue");
-    const controllerRef = db
-      .collection("guilds/" + message.guild.id + "/VC/")
-      .doc("controller");
-
-    var queueObserver = queueObservers.get(message.guild.id);
-    if (!queueObserver) {
-      queueObserver = queueRef.onSnapshot((doc) => {
-        try {
-          const serverQueue = queue.get(message.guild.id);
-          const dbQueue = doc.data() ? doc.data().queue : [];
-          if (serverQueue) {
-            var songShift = true;
-            var i = 0;
-            // checks if song is missing from db
-            for (let a of serverQueue.songs) {
-              var found = false;
-              for (let b of dbQueue) {
-                if (a.id == b.id) {
-                  found = true;
-                  break;
-                }
-              }
-              if (!found) {
-                if (i == 0) {
-                  playback.skip(loop[0], volume, message, serverQueue);
-                } else {
-                  var removed = serverQueue.songs.splice(i, 1)[0];
-                  console.log(removed);
-                  message.channel.send("Removed " + removed.title);
-                }
-                songShift = false;
-              } else {
-                i++;
-              }
-            }
-            i = 0;
-            //checks if song is missing from server
-            for (let b of dbQueue) {
-              var found = false;
-              for (let a of serverQueue.songs) {
-                if (a.id == b.id) {
-                  found = true;
-                  break;
-                }
-              }
-              if (!found) {
-                serverQueue.songs.splice(i, 0, b);
-                message.channel.send(
-                  `${i} - ${b.title} has been added to the queue!`
-                );
-                songShift = false;
-              } else {
-                i++;
-              }
-            }
-            if (songShift) {
-              serverQueue.songs = dbQueue;
-            }
-            queue.set(message.guild.id, serverQueue);
-          }
-        } catch (err) {
-          console.error(err);
-        }
-      });
-      queueObservers.set(message.guild.id, queueObserver);
-    }
-
-    var volume = serverVolumes.get(message.guild.id);
-    if (!volume) {
-      serverVolumes.set(message.guild.id, 7);
-      volume = 7;
-    }
-
-    var controllerObserver = controllerObservers.get(message.guild.id);
-    if (!controllerObserver) {
-      controllerObserver = controllerRef.onSnapshot((doc) => {
-        try {
-          const dbController = doc.data();
-          const id = message.guild.id;
-          const serverQueue = queue.get(id);
-          var volume = serverVolumes.get(id);
-          if (dbController) {
-            //check for differences
-            if (dbController.volume != volume) {
-              volume = dbController.volume;
-              serverVolumes.set(message.guild.id, volume);
-              message.channel.send("Volume: " + volume);
-              if (serverQueue && serverQueue.connection) {
-                const dispatcher = serverQueue.connection.dispatcher;
-                dispatcher.setVolumeLogarithmic(volume / 50);
-              }
-            }
-            if (dbController.shuffleMode != shuffleMode[0]) {
-              shuffleMode[0] = dbController.shuffleMode;
-              if (shuffleMode[0]) {
-                return message.channel.send("Now in shuffle mode!");
-              } else {
-                return message.channel.send(
-                  "No longer in shuffle mode.... :frowning:"
-                );
-              }
-            }
-            if (dbController.loop != loop[0]) {
-              loop[0] = dbController.loop;
-              switch (loop[0]) {
-                case 0:
-                  message.channel.send("No longer looping!");
-                  break;
-                case 1:
-                  message.channel.send("Now looping queue!");
-                  break;
-                case 2:
-                  message.channel.send("Now looping song!");
-                  break;
-              }
-            }
-            if (dbController.pauseState != pauseState[0]) {
-              if (dbController.pauseState) {
-                playback.pause(pauseState, message, serverQueue);
-              } else {
-                playback.resume(pauseState, message, serverQueue);
-              }
-            }
-          } else {
-            //upload controller
-            controllerRef.set({
-              volume: serverVolumes.get(id),
-              shuffleMode: shuffleMode[0],
-              loop: loop[0],
-              pauseState: false
-            });
-          }
-        } catch (err) {
-          console.error(err);
-        }
-      });
-      controllerObservers.set(message.guild.id, controllerObserver);
-    }
+    const serverQueue = admin.queue.get(message.guild.id);
 
     // If message starts with !
     if (
@@ -237,7 +260,7 @@ bot.on("message", (message) => {
           printCommands.printCommands(message);
           break;
         case "add":
-          addSong(message, serverQueue);
+          add.addSong(message, serverQueue);
           break;
         case "remove":
           queueController.remove(message, serverQueue);
@@ -247,46 +270,42 @@ bot.on("message", (message) => {
           break;
         case "shuffle":
           if (args[1] && args[1] === "mode") {
-            queueController.toggleShuffle(shuffleMode, message);
-            controllerRef.set(
-              {
-                shuffleMode: shuffleMode[0]
-              },
-              { merge: true }
-            );
+            queueController.toggleShuffle(message);
+            db.pushController({
+              shuffleMode: admin.shuffleMode.get(guild.id)
+            });
           } else {
             queueController.shuffle(message, serverQueue);
           }
           break;
         case "pause":
           playback.pause(message, serverQueue);
-          controllerRef.set(
-            {
-              pauseState: true
-            },
-            { merge: true }
-          );
+          db.pushController({
+            pauseState: true
+          });
           break;
         case "search":
-          searchSong(message, serverQueue);
+          search.searchSong(message);
           break;
         case "select":
-          selectSong(message, serverQueue);
+          select.selectSong(message, serverQueue);
           break;
         case "play":
           playback.resume(message, serverQueue);
-          controllerRef.set(
-            {
-              pauseState: false
-            },
-            { merge: true }
-          );
+          db.pushController({
+            pauseState: false
+          });
           break;
         case "skip":
-          playback.skip(loop[0], volume, message, serverQueue);
+          playback.skip(
+            admin.loop.get(message.guild.id),
+            admin.serverVolumes.get(message.guild.id),
+            message,
+            serverQueue
+          );
           break;
         case "stop":
-          playback.stop(loop[0], message, serverQueue);
+          playback.stop(admin.loop.get(message.guild.id), message, serverQueue);
           break;
         case "now":
         case "current":
@@ -301,22 +320,16 @@ bot.on("message", (message) => {
           display.list(message, serverQueue);
           break;
         case "volume":
-          playback.changeVolume(serverVolumes, message, serverQueue);
-          controllerRef.set(
-            {
-              volume: serverVolumes.get(message.guild.id)
-            },
-            { merge: true }
-          );
+          playback.changeVolume(admin.serverVolumes, message, serverQueue);
+          db.pushController({
+            volume: admin.serverVolumes.get(message.guild.id)
+          });
           break;
         case "loop":
-          playback.toggleLoop(loop, message);
-          controllerRef.set(
-            {
-              loop: loop[0]
-            },
-            { merge: true }
-          );
+          playback.toggleLoop(message);
+          db.pushController({
+            loop: admin.loop.get(message.guild.id)
+          });
           break;
         default:
           message.channel.send("Sorry, I don't know that command...");
@@ -358,537 +371,3 @@ bot.on("message", (message) => {
     console.error(err);
   }
 });
-
-async function searchSong(message, serverQueue) {
-  const args = message.content.split(" ");
-  var maxResults = 5;
-  try {
-    if (!args[1]) {
-      return message.channel.send("```!search name```");
-    }
-    var service = google.youtube("v3");
-    var search = args[1];
-    for (var i = 2; i < args.length; i++) {
-      search += "+";
-      search += args[i];
-    }
-    var id;
-    var docs;
-    await db
-      .collection("searches/videos/" + search)
-      .get()
-      .then((snapshots) => {
-        docs = snapshots.docs;
-        if (snapshots.docs[0]) id = snapshots.docs[0].data().id.videoId;
-      });
-    if (id) {
-      var songs = [];
-      for (let doc of docs) {
-        const url = "https://www.youtube.com/watch?v=" + doc.data().id.videoId;
-        const songInfo = await ytdl.getInfo(url);
-        songs.push({
-          title: songInfo.title,
-          url: songInfo.video_url,
-          id: doc.data().id.videoId
-        });
-      }
-      searchList = songs;
-      display.displaySearchList(searchList, message);
-    } else {
-      // Search Youtube for video
-      service.search.list(
-        {
-          auth: youtubeKey[0],
-          part: "snippet",
-          type: "video",
-          maxResults: maxResults,
-          q: search
-        },
-        async function(err, response) {
-          if (err) {
-            console.log(err);
-            if (err.code == 403 || err.code == 429) {
-              youtubeKey[0] = auth.backupKey;
-              message.channel.send(
-                "Quota reached, switching to backup key...\n Try again!"
-              );
-            }
-            return;
-          }
-          var results = response.data.items;
-          var songs = [];
-          for (let i = 0; i < results.length; i++) {
-            db.collection("searches/videos/" + search)
-              .doc(i.toString())
-              .set(results[i]);
-            const url =
-              "https://www.youtube.com/watch?v=" + results[i].id.videoId;
-            const songInfo = await ytdl.getInfo(url);
-            songs.push({
-              title: songInfo.title,
-              url: songInfo.video_url,
-              id: results[i].id.videoId
-            });
-          }
-          searchList = songs;
-          display.displaySearchList(searchList, message);
-        }
-      );
-    }
-  } catch (err) {
-    console.error(err);
-  }
-}
-
-async function selectSong(message, serverQueue) {
-  try {
-    const args = message.content.split(" ");
-    const voiceChannel = message.member.voiceChannel;
-
-    if (!voiceChannel)
-      return message.channel.send(
-        "You need to be in a voice channel to add music!"
-      );
-    const permissions = voiceChannel.permissionsFor(message.client.user);
-    if (!permissions.has("CONNECT") || !permissions.has("SPEAK")) {
-      return message.channel.send(
-        "I need permissions to join and speak in your voice channel!"
-      );
-    }
-    if (!args[1]) {
-      message.channel.send("```!select id```");
-      return;
-    }
-    if (args[1] > searchList.length) {
-      message.channel.send("Invalid selection");
-      display.displaySearchList(searchList, message);
-      return;
-    }
-    const song = searchList[args[1]];
-
-    if (!serverQueue) {
-      // Creating the contract for our queue
-      const queueContruct = {
-        textChannel: message.channel,
-        voiceChannel: voiceChannel,
-        connection: null,
-        songs: [],
-        volume: 5,
-        playing: true
-      };
-      // Setting the queue using our contract
-      queue.set(message.guild.id, queueContruct);
-      // Pushing the song to our songs array
-      queueContruct.songs.push(song);
-
-      try {
-        // Here we try to join the voicechat and save our connection into our object.
-        var connection = await voiceChannel.join();
-        queueContruct.connection = connection;
-        // Calling the play function to start a song
-        playSong(message, queueContruct.songs[0]);
-      } catch (err) {
-        // Printing the error message if the bot fails to join the voicechat
-        console.log(err);
-        queue.delete(message.guild.id);
-        return message.channel.send(err);
-      }
-    } else {
-      if (shuffleMode[0] && serverQueue.songs.length > 1) {
-        const index =
-          Math.floor(Math.random() * (serverQueue.songs.length - 2)) + 1;
-        serverQueue.songs.splice(index, 0, song);
-      } else {
-        serverQueue.songs.push(song);
-      }
-      var num = !serverQueue ? 0 : serverQueue.songs.length - 1;
-      db.collection("guilds/" + message.guild.id + "/VC")
-        .doc("queue")
-        .set({ queue: serverQueue.songs });
-      return message.channel.send(
-        `${num} - ${song.title} has been added to the queue!`
-      );
-    }
-  } catch (err) {
-    console.error(err);
-  }
-}
-
-async function addSong(message, serverQueue) {
-  try {
-    const args = message.content.split(" ");
-    const voiceChannel = message.member.voiceChannel;
-
-    if (!voiceChannel)
-      return message.channel.send(
-        "You need to be in a voice channel to play music!"
-      );
-    const permissions = voiceChannel.permissionsFor(message.client.user);
-    if (!permissions.has("CONNECT") || !permissions.has("SPEAK")) {
-      return message.channel.send(
-        "I need permissions to join and speak in your voice channel!"
-      );
-    }
-    if (!args[1]) {
-      message.channel.send("```!add name```");
-      return message.channel.send("```!add url```");
-    }
-    if (args[1].toLowerCase() === "playlist" && !validUrl.validURL(args[2])) {
-      if (args.length < 3)
-        return message.channel.send("```!add playlist [playlist name]```");
-      var service = google.youtube("v3");
-      var search = args[2];
-      for (var i = 3; i < args.length; i++) {
-        search += "+";
-        search += args[i];
-      }
-      var id;
-      await db
-        .collection("searches/playlists/" + search)
-        .get()
-        .then((snapshots) => {
-          if (snapshots.docs[0]) id = snapshots.docs[0].data().id.playlistId;
-        });
-      if (id) {
-        var service = google.youtube("v3");
-        service.playlistItems.list(
-          {
-            auth: youtubeKey[0],
-            maxResults: 50,
-            part: "snippet",
-            playlistId: id
-          },
-          async (err, response) => {
-            if (err) {
-              console.log(err);
-              if (err.code == 403 || err.code == 429) {
-                youtubeKey[0] = auth.backupKey;
-                message.channel.send(
-                  "Quota reached, switching to backup key...\n Try again!"
-                );
-              }
-              return;
-            }
-            var results = response.data.items;
-            // Send songs in batches of 5
-            var formattedMessage = "";
-            let i = 0;
-            for (let result of results) {
-              serverQueue = queue.get(message.guild.id);
-              var url =
-                "https://www.youtube.com/watch?v=" +
-                result.snippet.resourceId.videoId;
-              formattedMessage += await addSongToQueue(
-                url,
-                message,
-                serverQueue,
-                voiceChannel
-              );
-              formattedMessage += "\n";
-              i++;
-              if (!shuffleMode[0] && i == 5) {
-                i = 0;
-                message.channel.send(formattedMessage);
-                formattedMessage = "";
-              }
-            }
-            if (!shuffleMode[0] && i != 0) {
-              message.channel.send(formattedMessage);
-            }
-            if (shuffleMode[0]) {
-              display.list(message, serverQueue);
-            }
-          }
-        );
-      } else {
-        service.search.list(
-          {
-            auth: youtubeKey[0],
-            type: "playlist",
-            maxResults: 5,
-            part: "snippet",
-            q: search
-          },
-          (err, response) => {
-            if (err) {
-              console.log(err);
-              if (err.code == 403 || err.code == 429) {
-                youtubeKey[0] = auth.backupKey;
-                message.channel.send(
-                  "Quota reached, switching to backup key...\n Try again!"
-                );
-              }
-              return;
-            }
-            var results = response.data.items;
-            let i = 0;
-            for (let result of results) {
-              db.collection("searches/playlists/" + search)
-                .doc(i.toString())
-                .set(result);
-              i++;
-            }
-            var service = google.youtube("v3");
-            var id = results[0].id.playlistId;
-            service.playlistItems.list(
-              {
-                auth: youtubeKey[0],
-                maxResults: 50,
-                part: "snippet",
-                playlistId: id
-              },
-              async (err, response) => {
-                if (err) {
-                  console.log(err);
-                  if (err.code == 403 || err.code == 429) {
-                    youtubeKey[0] = auth.backupKey;
-                    message.channel.send(
-                      "Quota reached, switching to backup key...\n Try again!"
-                    );
-                  }
-                  return;
-                }
-                var results = response.data.items;
-                // Send songs in batches of 5
-                var formattedMessage = "";
-                let i = 0;
-                for (let result of results) {
-                  serverQueue = queue.get(message.guild.id);
-                  var url =
-                    "https://www.youtube.com/watch?v=" +
-                    result.snippet.resourceId.videoId;
-                  formattedMessage += await addSongToQueue(
-                    url,
-                    message,
-                    serverQueue,
-                    voiceChannel
-                  );
-                  formattedMessage += "\n";
-                  i++;
-                  if (!shuffleMode[0] && i == 5) {
-                    i = 0;
-                    message.channel.send(formattedMessage);
-                    formattedMessage = "";
-                  }
-                }
-                if (!shuffleMode[0] && i != 0) {
-                  message.channel.send(formattedMessage);
-                }
-                if (shuffleMode[0]) {
-                  display.list(message, serverQueue);
-                }
-              }
-            );
-          }
-        );
-      }
-    } else if (args[1].toLowerCase() === "playlist") {
-      var service = google.youtube("v3");
-      var id = args[2].split("https://www.youtube.com/playlist?list=")[1];
-      service.playlistItems.list(
-        {
-          auth: youtubeKey[0],
-          maxResults: 50,
-          part: "snippet",
-          playlistId: id
-        },
-        async (err, response) => {
-          if (err) {
-            console.log(err);
-            if (err.code == 403 || err.code == 429) {
-              youtubeKey[0] = auth.backupKey;
-              message.channel.send(
-                "Quota reached, switching to backup key...\n Try again!"
-              );
-            }
-            return;
-          }
-          var results = response.data.items;
-          // Send songs in batches of 5
-          var formattedMessage = "";
-          let i = 0;
-          for (let result of results) {
-            serverQueue = queue.get(message.guild.id);
-            var url =
-              "https://www.youtube.com/watch?v=" +
-              result.snippet.resourceId.videoId;
-            formattedMessage += await addSongToQueue(
-              url,
-              message,
-              serverQueue,
-              voiceChannel
-            );
-            formattedMessage += "\n";
-            i++;
-            if (!shuffleMode[0] && i == 5) {
-              i = 0;
-              message.channel.send(formattedMessage);
-              formattedMessage = "";
-            }
-          }
-          if (!shuffleMode[0] && i != 0) {
-            message.channel.send(formattedMessage);
-          }
-          if (shuffleMode[0]) {
-            display.list(message, serverQueue);
-          }
-        }
-      );
-    } else if (!validUrl.validURL(args[1])) {
-      var service = google.youtube("v3");
-      var search = args[1];
-      for (var i = 2; i < args.length; i++) {
-        search += "+";
-        search += args[i];
-      }
-      var id;
-      await db
-        .collection("searches/videos/" + search)
-        .get()
-        .then((snapshots) => {
-          if (snapshots.docs[0]) id = snapshots.docs[0].data().id.videoId;
-        });
-      if (id) {
-        var url = "https://www.youtube.com/watch?v=" + id;
-        return message.channel.send(
-          await addSongToQueue(url, message, serverQueue, voiceChannel)
-        );
-      } else {
-        // Search Youtube for video
-        service.search.list(
-          {
-            auth: youtubeKey[0],
-            type: "video",
-            maxResults: 5,
-            part: "snippet",
-            q: search
-          },
-          async (err, response) => {
-            if (err) {
-              console.log(err);
-              if (err.code == 403 || err.code == 429) {
-                youtubeKey[0] = auth.backupKey;
-                message.channel.send(
-                  "Quota reached, switching to backup key...\n Try again!"
-                );
-              }
-              return;
-            }
-            var results = response.data.items;
-            var i = 0;
-            for (let result of results) {
-              db.collection("searches/videos/" + search)
-                .doc(i.toString())
-                .set(result);
-              i++;
-            }
-            var url =
-              "https://www.youtube.com/watch?v=" + results[0].id.videoId;
-            return message.channel.send(
-              await addSongToQueue(url, message, serverQueue, voiceChannel)
-            );
-          }
-        );
-      }
-    } else {
-      return message.channel.send(
-        await addSongToQueue(args[1], message, serverQueue, voiceChannel)
-      );
-    }
-  } catch (err) {
-    console.log(err);
-  }
-}
-
-async function addSongToQueue(videoUrl, message, serverQueue, voiceChannel) {
-  const songInfo = await ytdl.getInfo(videoUrl);
-  var thumbnail =
-    songInfo.player_response.videoDetails.thumbnail.thumbnails[
-      songInfo.player_response.videoDetails.thumbnail.thumbnails.length - 1
-    ];
-  const song = {
-    title: songInfo.title,
-    url: songInfo.video_url,
-    id: songInfo.video_id,
-    thumbnail: thumbnail
-  };
-  if (!serverQueue) {
-    // Creating the contract for our queue
-    const queueContruct = {
-      textChannel: message.channel,
-      voiceChannel: voiceChannel,
-      connection: null,
-      songs: [],
-      volume: 5,
-      playing: true
-    };
-    // Setting the queue using our contract
-    queue.set(message.guild.id, queueContruct);
-    // Pushing the song to our songs array
-    queueContruct.songs.push(song);
-
-    try {
-      // Here we try to join the voicechat and save our connection into our object.
-      var connection = await voiceChannel.join();
-      queueContruct.connection = connection;
-      // Calling the play function to start a song
-      playSong(message, queueContruct.songs[0]);
-    } catch (err) {
-      // Printing the error message if the bot fails to join the voicechat
-      console.log(err);
-      queue.delete(message.guild.id);
-      return message.channel.send(err);
-    }
-  } else {
-    if (shuffleMode[0] && serverQueue.songs.length > 1) {
-      const index =
-        Math.floor(Math.random() * (serverQueue.songs.length - 2)) + 1;
-      serverQueue.songs.splice(index, 0, song);
-    } else {
-      serverQueue.songs.push(song);
-    }
-    db.collection("guilds/" + message.guild.id + "/VC")
-      .doc("queue")
-      .set({ queue: serverQueue.songs });
-  }
-  var num = !serverQueue ? 0 : serverQueue.songs.length - 1;
-  return `${num} - ${song.title} has been added to the queue!`;
-}
-
-function playSong(message, song) {
-  const serverQueue = queue.get(message.guild.id);
-  if (!song) {
-    serverQueue.voiceChannel.leave();
-    queue.delete(message.guild.id);
-    db.collection("guilds/" + message.guild.id + "/VC")
-      .doc("queue")
-      .set({ queue: [] });
-    message.channel.send("Bye!");
-    return;
-  }
-  db.collection("guilds/" + message.guild.id + "/VC")
-    .doc("queue")
-    .set({ queue: serverQueue.songs });
-  const dispatcher = serverQueue.connection
-    .playStream(ytdl(song.url))
-    .on("end", () => {
-      switch (loop[0]) {
-        case 0: // no looping
-          serverQueue.songs.shift();
-          break;
-        case 1: // queue looping
-          serverQueue.songs.push(serverQueue.songs[0]);
-          serverQueue.songs.shift();
-          break;
-        case 2: // song looping
-          break;
-      }
-      display.current(message, serverQueue);
-      playSong(message, serverQueue.songs[0]);
-    })
-    .on("error", (error) => {
-      console.error(error);
-    });
-  const volume = serverVolumes.get(message.guild.id);
-  dispatcher.setVolumeLogarithmic(volume / 50);
-}

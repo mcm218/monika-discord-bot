@@ -31,9 +31,16 @@ function listSongs(message, serverQueue) {
   for (let song of serverQueue.songs) {
     formattedList += `${i} - ${song.title}\n`;
     i++;
+    if (i % 10 == 0) {
+      formattedList += "```";
+      message.channel.send(formattedList);
+      formattedList = "```";
+    }
   }
-  formattedList += "```"
-  message.channel.send(formattedList);
+  if (i % 10 != 0) {
+    formattedList += "```";
+    message.channel.send(formattedList);
+  }
 }
 
 module.exports = {

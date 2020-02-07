@@ -1,8 +1,10 @@
 function printCommands(message) {
-  var formattedMessage = "All songs are from Youtube\n";
+  var formattedMessage = "https://monika-discord-bot.web.app \n";
+  formattedMessage += "All songs are from Youtube\n"
   formattedMessage += "```";
   formattedMessage += "!add url              - add song using URL\n";
   formattedMessage += "!add name             - add first song from name search results\n";
+  formattedMessage += "!add playlist url     - add playlist using URL\n";
   formattedMessage += "!add playlist name    - add first playlist from name search results\n";
   formattedMessage += "!search name          - list first five search results\n";
   formattedMessage += "!select id            - select from previous search results\n";

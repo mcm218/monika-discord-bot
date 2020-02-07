@@ -1,18 +1,21 @@
+const admin = require("./admin");
 // 0 - no looping
 // 1 - queue looping
 // 2 - song looping
-function toggleLoop(loop, message) {
+function toggleLoop(message) {
+  var loop = admin.loop.get(message.guild.id);
   if (!message.member.voiceChannel) {
     return message.channel.send(
       "You need to be in a voice channel to loop music!"
     );
   }
-  loop[0]++;
-  if (loop[0] > 2) {
-    loop[0] = 0;
+  loop++;
+  if (loop > 2) {
+    loop = 0;
   }
+  admin.loop.set(message.guild.id, loop);
   // Adding song looping
-  switch (loop[0]) {
+  switch (loop) {
     case 0:
       message.channel.send("No longer looping!");
       break;
@@ -25,26 +28,26 @@ function toggleLoop(loop, message) {
   }
 }
 
-function resumeSong(pauseState, message, serverQueue) {
+function resumeSong(message, serverQueue) {
   if (!message.member.voiceChannel)
     return message.channel.send(
       "You need to be in a voice channel to resume music!"
     );
   if (!serverQueue)
     return message.channel.send("There are no songs for me to resume!");
-  pauseState[0] = false;
+  admin.pauseState.set(message.guild.id, false);
   serverQueue.connection.dispatcher.resume();
   message.channel.send("Resuming!");
 }
 
-function pauseSong(pauseState, message, serverQueue) {
+function pauseSong(message, serverQueue) {
   if (!message.member.voiceChannel)
     return message.channel.send(
       "You need to be in a voice channel to pause music!"
     );
   if (!serverQueue)
     return message.channel.send("There are no songs for me to pause!");
-  pauseState[0] = true;
+  admin.pauseState.set(message.guild.id, true);
   serverQueue.connection.dispatcher.pause();
   message.channel.send("Paused!");
 }
@@ -100,7 +103,7 @@ function changeVolume(serverVolumes, message, serverQueue) {
   }
   const args = message.content.split(" ");
   if (!args[1]) {
-    message.channel.send("```!volume 0:30```");
+    message.channel.send("Volume: " + serverVolumes.get(message.guild.id));
     return;
   }
   if (args[1] < 0 || args[1] > 30) {

@@ -77,14 +77,16 @@ function shuffle(message, serverQueue) {
   message.channel.send("Shuffled!");
 }
 
-function toggleShuffleMode(shuffleMode, message) {
+function toggleShuffleMode(message) {
+  var shuffleMode = admin.shuffleMode.get(message.guild.id);
   if (!message.member.voiceChannel) {
     return message.channel.send(
       "You need to be in a voice channel to toggle shuffle mode!"
     );
   }
-  shuffleMode[0] = !shuffleMode[0];
-  if (shuffleMode[0]) {
+  shuffleMode = !shuffleMode;
+  admin.shuffleMode.set(message.guild.id, shuffleMode);
+  if (shuffleMode) {
     return message.channel.send("Now in shuffle mode!");
   } else {
     return message.channel.send("No longer in shuffle mode.... :frowning:");
