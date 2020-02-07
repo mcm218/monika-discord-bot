@@ -13,7 +13,6 @@ var { google } = require("googleapis");
 // Firebase App (the core Firebase SDK) is always required and
 // must be listed before other Firebase SDKs
 var firebase = require("firebase/app");
-
 // Add the Firebase products that you want to use
 require("firebase/firestore");
 
@@ -24,13 +23,15 @@ firebase.initializeApp(firebaseConfig);
 let db = firebase.firestore();
 
 const queue = new Map();
-const observers = new Map();
+const queueObservers = new Map();
+const controllerObservers = new Map();
 var searchList = [];
 const loop = [];
 // 0 - no looping
 // 1 - queue looping
 // 2 - song looping
 const shuffleMode = [];
+const pauseState = [];
 var serverVolumes = new Map();
 const youtubeKey = [];
 
@@ -45,6 +46,7 @@ logger.level = "debug";
 var bot = new Discord.Client();
 // Update DB whenever user joins/leaves VC
 bot.on("voiceStateUpdate", (oldMember, newMember) => {
+  if (newMember.user.bot) return;
   if (newMember.voiceChannel) {
     console.log(newMember.displayName + " has joined the VC!");
     db.collection("guilds/" + newMember.voiceChannel.guild.id + "/VC")
@@ -65,6 +67,7 @@ bot.on("ready", () => {
   logger.info(bot.user.tag);
   loop.push(0);
   shuffleMode.push(false);
+  pauseState.push(false);
   youtubeKey.push(auth.youtubeKey);
 });
 
@@ -75,12 +78,16 @@ bot.on("message", (message) => {
   if (message.author.bot) return; // Prevents bot from activating its self
   try {
     const serverQueue = queue.get(message.guild.id);
-    const docRef = db
+    const queueRef = db
       .collection("guilds/" + message.guild.id + "/VC/")
       .doc("queue");
-    var serverObserver = observers.get(message.guild.id);
-    if (!serverObserver) {
-      serverObserver = docRef.onSnapshot((doc) => {
+    const controllerRef = db
+      .collection("guilds/" + message.guild.id + "/VC/")
+      .doc("controller");
+
+    var queueObserver = queueObservers.get(message.guild.id);
+    if (!queueObserver) {
+      queueObserver = queueRef.onSnapshot((doc) => {
         try {
           const serverQueue = queue.get(message.guild.id);
           const dbQueue = doc.data() ? doc.data().queue : [];
@@ -97,9 +104,13 @@ bot.on("message", (message) => {
                 }
               }
               if (!found) {
-                var removed = serverQueue.songs.splice(i, 1)[0];
-                console.log(removed);
-                message.channel.send("Removed " + removed.title);
+                if (i == 0) {
+                  playback.skip(loop[0], volume, message, serverQueue);
+                } else {
+                  var removed = serverQueue.songs.splice(i, 1)[0];
+                  console.log(removed);
+                  message.channel.send("Removed " + removed.title);
+                }
                 songShift = false;
               } else {
                 i++;
@@ -133,30 +144,82 @@ bot.on("message", (message) => {
         } catch (err) {
           console.error(err);
         }
-
-        // if (
-        //   serverQueue &&
-        //   serverQueue.songs &&
-        //   serverQueue.songs.length > doc.data().queue.length
-        // ) {
-        //   // find differences
-        //   serverQueue
-        //   // remove something
-        // } else if (
-        //   serverQueue &&
-        //   serverQueue.songs &&
-        //   serverQueue.songs.length < doc.data().queue.length
-        // ) {
-        //   // add something
-        // }
       });
-      observers.set(message.guild.id, serverObserver);
+      queueObservers.set(message.guild.id, queueObserver);
     }
+
     var volume = serverVolumes.get(message.guild.id);
     if (!volume) {
       serverVolumes.set(message.guild.id, 7);
       volume = 7;
     }
+
+    var controllerObserver = controllerObservers.get(message.guild.id);
+    if (!controllerObserver) {
+      controllerObserver = controllerRef.onSnapshot((doc) => {
+        try {
+          const dbController = doc.data();
+          const id = message.guild.id;
+          const serverQueue = queue.get(id);
+          var volume = serverVolumes.get(id);
+          if (dbController) {
+            //check for differences
+            if (dbController.volume != volume) {
+              volume = dbController.volume;
+              serverVolumes.set(message.guild.id, volume);
+              message.channel.send("Volume: " + volume);
+              if (serverQueue && serverQueue.connection) {
+                const dispatcher = serverQueue.connection.dispatcher;
+                dispatcher.setVolumeLogarithmic(volume / 50);
+              }
+            }
+            if (dbController.shuffleMode != shuffleMode[0]) {
+              shuffleMode[0] = dbController.shuffleMode;
+              if (shuffleMode[0]) {
+                return message.channel.send("Now in shuffle mode!");
+              } else {
+                return message.channel.send(
+                  "No longer in shuffle mode.... :frowning:"
+                );
+              }
+            }
+            if (dbController.loop != loop[0]) {
+              loop[0] = dbController.loop;
+              switch (loop[0]) {
+                case 0:
+                  message.channel.send("No longer looping!");
+                  break;
+                case 1:
+                  message.channel.send("Now looping queue!");
+                  break;
+                case 2:
+                  message.channel.send("Now looping song!");
+                  break;
+              }
+            }
+            if (dbController.pauseState != pauseState[0]) {
+              if (dbController.pauseState) {
+                playback.pause(pauseState, message, serverQueue);
+              } else {
+                playback.resume(pauseState, message, serverQueue);
+              }
+            }
+          } else {
+            //upload controller
+            controllerRef.set({
+              volume: serverVolumes.get(id),
+              shuffleMode: shuffleMode[0],
+              loop: loop[0],
+              pauseState: false
+            });
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      });
+      controllerObservers.set(message.guild.id, controllerObserver);
+    }
+
     // If message starts with !
     if (
       message.content.substring(0, 1) == config.prefix ||
@@ -185,12 +248,24 @@ bot.on("message", (message) => {
         case "shuffle":
           if (args[1] && args[1] === "mode") {
             queueController.toggleShuffle(shuffleMode, message);
+            controllerRef.set(
+              {
+                shuffleMode: shuffleMode[0]
+              },
+              { merge: true }
+            );
           } else {
             queueController.shuffle(message, serverQueue);
           }
           break;
         case "pause":
           playback.pause(message, serverQueue);
+          controllerRef.set(
+            {
+              pauseState: true
+            },
+            { merge: true }
+          );
           break;
         case "search":
           searchSong(message, serverQueue);
@@ -200,6 +275,12 @@ bot.on("message", (message) => {
           break;
         case "play":
           playback.resume(message, serverQueue);
+          controllerRef.set(
+            {
+              pauseState: false
+            },
+            { merge: true }
+          );
           break;
         case "skip":
           playback.skip(loop[0], volume, message, serverQueue);
@@ -221,9 +302,21 @@ bot.on("message", (message) => {
           break;
         case "volume":
           playback.changeVolume(serverVolumes, message, serverQueue);
+          controllerRef.set(
+            {
+              volume: serverVolumes.get(message.guild.id)
+            },
+            { merge: true }
+          );
           break;
         case "loop":
           playback.toggleLoop(loop, message);
+          controllerRef.set(
+            {
+              loop: loop[0]
+            },
+            { merge: true }
+          );
           break;
         default:
           message.channel.send("Sorry, I don't know that command...");
@@ -440,7 +533,7 @@ async function addSong(message, serverQueue) {
       message.channel.send("```!add name```");
       return message.channel.send("```!add url```");
     }
-    if (args[1].toLowerCase() === "playlist") {
+    if (args[1].toLowerCase() === "playlist" && !validUrl.validURL(args[2])) {
       if (args.length < 3)
         return message.channel.send("```!add playlist [playlist name]```");
       var service = google.youtube("v3");
@@ -512,7 +605,7 @@ async function addSong(message, serverQueue) {
           {
             auth: youtubeKey[0],
             type: "playlist",
-            maxResults: 1,
+            maxResults: 5,
             part: "snippet",
             q: search
           },
@@ -527,12 +620,16 @@ async function addSong(message, serverQueue) {
               }
               return;
             }
-            var results = response.data.items[0];
-            db.collection("searches/playlists/" + search)
-              .doc("0")
-              .set(results);
+            var results = response.data.items;
+            let i = 0;
+            for (let result of results) {
+              db.collection("searches/playlists/" + search)
+                .doc(i.toString())
+                .set(result);
+              i++;
+            }
             var service = google.youtube("v3");
-            var id = results.id.playlistId;
+            var id = results[0].id.playlistId;
             service.playlistItems.list(
               {
                 auth: youtubeKey[0],
@@ -585,6 +682,58 @@ async function addSong(message, serverQueue) {
           }
         );
       }
+    } else if (args[1].toLowerCase() === "playlist") {
+      var service = google.youtube("v3");
+      var id = args[2].split("https://www.youtube.com/playlist?list=")[1];
+      service.playlistItems.list(
+        {
+          auth: youtubeKey[0],
+          maxResults: 50,
+          part: "snippet",
+          playlistId: id
+        },
+        async (err, response) => {
+          if (err) {
+            console.log(err);
+            if (err.code == 403 || err.code == 429) {
+              youtubeKey[0] = auth.backupKey;
+              message.channel.send(
+                "Quota reached, switching to backup key...\n Try again!"
+              );
+            }
+            return;
+          }
+          var results = response.data.items;
+          // Send songs in batches of 5
+          var formattedMessage = "";
+          let i = 0;
+          for (let result of results) {
+            serverQueue = queue.get(message.guild.id);
+            var url =
+              "https://www.youtube.com/watch?v=" +
+              result.snippet.resourceId.videoId;
+            formattedMessage += await addSongToQueue(
+              url,
+              message,
+              serverQueue,
+              voiceChannel
+            );
+            formattedMessage += "\n";
+            i++;
+            if (!shuffleMode[0] && i == 5) {
+              i = 0;
+              message.channel.send(formattedMessage);
+              formattedMessage = "";
+            }
+          }
+          if (!shuffleMode[0] && i != 0) {
+            message.channel.send(formattedMessage);
+          }
+          if (shuffleMode[0]) {
+            display.list(message, serverQueue);
+          }
+        }
+      );
     } else if (!validUrl.validURL(args[1])) {
       var service = google.youtube("v3");
       var search = args[1];

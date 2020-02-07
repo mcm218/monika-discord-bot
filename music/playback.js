@@ -25,24 +25,26 @@ function toggleLoop(loop, message) {
   }
 }
 
-function resumeSong(message, serverQueue) {
+function resumeSong(pauseState, message, serverQueue) {
   if (!message.member.voiceChannel)
     return message.channel.send(
       "You need to be in a voice channel to resume music!"
     );
   if (!serverQueue)
     return message.channel.send("There are no songs for me to resume!");
+  pauseState[0] = false;
   serverQueue.connection.dispatcher.resume();
   message.channel.send("Resuming!");
 }
 
-function pauseSong(message, serverQueue) {
+function pauseSong(pauseState, message, serverQueue) {
   if (!message.member.voiceChannel)
     return message.channel.send(
       "You need to be in a voice channel to pause music!"
     );
   if (!serverQueue)
     return message.channel.send("There are no songs for me to pause!");
+  pauseState[0] = true;
   serverQueue.connection.dispatcher.pause();
   message.channel.send("Paused!");
 }
