@@ -65,7 +65,9 @@ bot.on("ready", () => {
       queueObserver = queueRef.onSnapshot(async (doc) => {
         try {
           var serverQueue = admin.queue.get(guild.id);
+          var init = false;
           if (!serverQueue) {
+            init = true;
             const queueContruct = {
               textChannel: musicChannel,
               voiceChannel: voiceChannel,
@@ -84,6 +86,7 @@ bot.on("ready", () => {
               // Printing the error message if the bot fails to join the voicechat
               console.log(err);
             }
+            admin.queue.set(guild.id, serverQueue);
           }
           const dbQueue = doc.data() ? doc.data().queue : [];
           var songShift = true;
@@ -138,11 +141,10 @@ bot.on("ready", () => {
           if (songShift) {
             serverQueue.songs = dbQueue;
           }
-          if (!admin.queue.get(guild.id)) {
+          if (init) {
             // Calling the play function to start a song
             play.dbPlaySong(musicChannel, serverQueue);
           }
-          admin.queue.set(guild.id, serverQueue);
         } catch (err) {
           console.error(err);
         }
