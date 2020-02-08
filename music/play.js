@@ -42,7 +42,6 @@ function dbPlaySong(channel, serverQueue) {
     admin.queue.delete(channel.guild.id);
     serverQueue.voiceChannel.leave();
     db.pushQueue(channel.guild.id, []);
-    channel.send("Bye!");
     return;
   }
   db.pushQueue(channel.guild.id, serverQueue.songs);
@@ -63,6 +62,8 @@ function dbPlaySong(channel, serverQueue) {
       }
       if (serverQueue.songs[0]) {
         channel.send(`Now playing: ${serverQueue.songs[0].title}`);
+      }else{
+        channel.send("Bye!");
       }
       dbPlaySong(channel, serverQueue);
     })
