@@ -1,4 +1,5 @@
 const display = require("./display");
+const admin = require("./admin");
 
 function removeSong(message, serverQueue) {
   try {

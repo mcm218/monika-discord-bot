@@ -52,6 +52,8 @@ bot.on("ready", () => {
     admin.pauseState.set(guild.id, false);
     var musicChannel;
     var voiceChannel;
+    return; 
+    // reconnect web app
     guild.channels.forEach((channel) => {
       if (channel.name == "music" && channel.type == "text") {
         musicChannel = channel;
@@ -323,7 +325,7 @@ bot.on("message", (message) => {
           break;
         case "volume":
           playback.changeVolume(admin.serverVolumes, message, serverQueue);
-          db.pushController({
+          db.pushController(message.guild.id, {
             volume: admin.serverVolumes.get(message.guild.id)
           });
           break;

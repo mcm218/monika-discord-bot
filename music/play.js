@@ -16,7 +16,7 @@ function playSong(message, song) {
   const dispatcher = serverQueue.connection
     .playStream(ytdl(song.url))
     .on("end", () => {
-      switch (admin.loop[0]) {
+      switch (admin.loop.get(message.guild.id)) {
         case 0: // no looping
           serverQueue.songs.shift();
           break;
