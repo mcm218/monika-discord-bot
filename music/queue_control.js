@@ -1,5 +1,6 @@
 const display = require("./display");
 const admin = require("./admin");
+const db = require("./database");
 
 function removeSong(message, serverQueue) {
   try {
@@ -87,6 +88,9 @@ function toggleShuffleMode(message) {
   }
   shuffleMode = !shuffleMode;
   admin.shuffleMode.set(message.guild.id, shuffleMode);
+  db.pushController(message.guild.id, {
+    shuffleMode: shuffleMode
+  });
   if (shuffleMode) {
     return message.channel.send("Now in shuffle mode!");
   } else {

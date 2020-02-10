@@ -27,6 +27,9 @@ function nextSong(message, serverQueue) {
 }
 function listSongs(message, serverQueue) {
   var i = 0;
+  if(!serverQueue || !serverQueue.songs){
+    return message.channel.send("There are no songs in the queue")
+  }
   var formattedList = "```";
   for (let song of serverQueue.songs) {
     formattedList += `${i} - ${song.title}\n`;

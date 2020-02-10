@@ -1,4 +1,5 @@
 const admin = require("./admin");
+const db = require("./database");
 // 0 - no looping
 // 1 - queue looping
 // 2 - song looping
@@ -14,6 +15,9 @@ function toggleLoop(message) {
     loop = 0;
   }
   admin.loop.set(message.guild.id, loop);
+  db.pushController(message.guild.id, {
+    loop: admin.loop.get(message.guild.id)
+  });
   // Adding song looping
   switch (loop) {
     case 0:
@@ -33,9 +37,12 @@ function resumeSong(message, serverQueue) {
     return message.channel.send(
       "You need to be in a voice channel to resume music!"
     );
-  if (!serverQueue)
+  if (!serverQueue || !serverQueue.songs)
     return message.channel.send("There are no songs for me to resume!");
   admin.pauseState.set(message.guild.id, false);
+  db.pushController(message.guild.id, {
+    pauseState: false
+  });
   serverQueue.connection.dispatcher.resume();
   message.channel.send("Resuming!");
 }
@@ -45,9 +52,12 @@ function pauseSong(message, serverQueue) {
     return message.channel.send(
       "You need to be in a voice channel to pause music!"
     );
-  if (!serverQueue)
+  if (!serverQueue || !serverQueue.songs)
     return message.channel.send("There are no songs for me to pause!");
   admin.pauseState.set(message.guild.id, true);
+  db.pushController(message.guild.id, {
+    pauseState: true
+  });
   serverQueue.connection.dispatcher.pause();
   message.channel.send("Paused!");
 }
@@ -57,13 +67,17 @@ function skipSong(loop, volume, message, serverQueue) {
     return message.channel.send(
       "You need to be in a voice channel to skip music!"
     );
-  if (!serverQueue) {
+  if (!serverQueue || !serverQueue.songs) {
     return message.channel.send("There are no songs for me to skip!");
   }
   if (loop == 2) {
     loop = 1;
     message.channel.send("Now looping queue!");
   }
+  admin.pauseState.set(message.guild.id, false);
+  db.pushController(message.guild.id, {
+    pauseState: false
+  });
   serverQueue.connection.dispatcher.end();
   if (serverQueue.connection.dispatcher) {
     serverQueue.connection.dispatcher.setVolumeLogarithmic(volume / 50);
@@ -75,6 +89,9 @@ function stopSongs(loop, message, serverQueue) {
     return message.channel.send(
       "You have to be in a voice channel to stop the music!"
     );
+  if (!serverQueue || !serverQueue.songs) {
+    return;
+  }
   switch (loop) {
     case 0:
       serverQueue.songs = [];
@@ -111,6 +128,9 @@ function changeVolume(serverVolumes, message, serverQueue) {
   }
   volume = args[1];
   serverVolumes.set(message.guild.id, volume);
+  db.pushController(message.guild.id, {
+    volume: admin.serverVolumes.get(message.guild.id)
+  });
   message.channel.send("Volume: " + volume);
   if (serverQueue && serverQueue.connection) {
     const dispatcher = serverQueue.connection.dispatcher;

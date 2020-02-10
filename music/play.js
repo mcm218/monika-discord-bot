@@ -33,6 +33,9 @@ function playSong(message, song) {
     .on("error", (error) => {
       console.error(error);
     });
+  if (admin.pauseState.get(channel.guild.id)) {
+    dispatcher.pause();
+  }
   const volume = admin.serverVolumes.get(message.guild.id);
   dispatcher.setVolumeLogarithmic(volume / 50);
 }
@@ -62,7 +65,7 @@ function dbPlaySong(channel, serverQueue) {
       }
       if (serverQueue.songs[0]) {
         channel.send(`Now playing: ${serverQueue.songs[0].title}`);
-      }else{
+      } else {
         channel.send("Bye!");
       }
       dbPlaySong(channel, serverQueue);

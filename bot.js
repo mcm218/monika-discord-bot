@@ -52,8 +52,6 @@ bot.on("ready", () => {
     admin.pauseState.set(guild.id, false);
     var musicChannel;
     var voiceChannel;
-    return; 
-    // reconnect web app
     guild.channels.forEach((channel) => {
       if (channel.name == "music" && channel.type == "text") {
         musicChannel = channel;
@@ -145,6 +143,7 @@ bot.on("ready", () => {
           }
           if (init) {
             // Calling the play function to start a song
+            admin.queue.set(guild.id, serverQueue);
             play.dbPlaySong(musicChannel, serverQueue);
           }
         } catch (err) {
@@ -203,17 +202,21 @@ bot.on("ready", () => {
               }
             }
             if (dbController.pauseState != admin.pauseState.get(guild.id)) {
-              if (dbController.pauseState) {
-                if (serverQueue.connection) {
-                  admin.pauseState.set(guild.id, true);
-                  serverQueue.connection.dispatcher.pause();
-                  musicChannel.send("Paused!");
-                }
+              if (!serverQueue || !serverQueue.connection) {
+                admin.pauseState.set(guild.id, dbController.pauseState);
               } else {
-                if (serverQueue.connection) {
-                  admin.pauseState.set(guild.id, false);
-                  serverQueue.connection.dispatcher.resume();
-                  musicChannel.send("Resuming!");
+                if (dbController.pauseState) {
+                  if (serverQueue.connection) {
+                    admin.pauseState.set(guild.id, true);
+                    serverQueue.connection.dispatcher.pause();
+                    musicChannel.send("Paused!");
+                  }
+                } else {
+                  if (serverQueue.connection) {
+                    admin.pauseState.set(guild.id, false);
+                    serverQueue.connection.dispatcher.resume();
+                    musicChannel.send("Resuming!");
+                  }
                 }
               }
             }
@@ -275,18 +278,12 @@ bot.on("message", (message) => {
         case "shuffle":
           if (args[1] && args[1] === "mode") {
             queueController.toggleShuffle(message);
-            db.pushController({
-              shuffleMode: admin.shuffleMode.get(guild.id)
-            });
           } else {
             queueController.shuffle(message, serverQueue);
           }
           break;
         case "pause":
           playback.pause(message, serverQueue);
-          db.pushController({
-            pauseState: true
-          });
           break;
         case "search":
           search.searchSong(message);
@@ -295,10 +292,8 @@ bot.on("message", (message) => {
           select.selectSong(message, serverQueue);
           break;
         case "play":
+        case "resume":
           playback.resume(message, serverQueue);
-          db.pushController({
-            pauseState: false
-          });
           break;
         case "skip":
           playback.skip(
@@ -325,15 +320,9 @@ bot.on("message", (message) => {
           break;
         case "volume":
           playback.changeVolume(admin.serverVolumes, message, serverQueue);
-          db.pushController(message.guild.id, {
-            volume: admin.serverVolumes.get(message.guild.id)
-          });
           break;
         case "loop":
           playback.toggleLoop(message);
-          db.pushController({
-            loop: admin.loop.get(message.guild.id)
-          });
           break;
         default:
           message.channel.send("Sorry, I don't know that command...");

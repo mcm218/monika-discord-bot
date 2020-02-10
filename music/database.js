@@ -76,7 +76,7 @@ function pushUser(gid, id, displayName) {
 }
 function pushController(gid, controller) {
   db.collection("guilds/" + gid + "/VC")
-    .doc(gid)
+    .doc("controller")
     .set(controller, { merge: true });
 }
 function popUser(gid, id) {
