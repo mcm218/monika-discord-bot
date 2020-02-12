@@ -33,7 +33,7 @@ function playSong(message, song) {
     .on("error", (error) => {
       console.error(error);
     });
-  if (admin.pauseState.get(channel.guild.id)) {
+  if (admin.pauseState.get(message.guild.id)) {
     dispatcher.pause();
   }
   const volume = admin.serverVolumes.get(message.guild.id);
