@@ -372,7 +372,7 @@ bot.on("message", (message) => {
       } else if (message.content.match(/milk/i)) {
         message.channel.send(copypastas.milk);
       } else if (message.content.match(/girl/i)) {
-        message.channel.send("<:alexiscoming:677292205865566224>");
+        message.channel.send("<:alexiscoming:677231662173519873>");
       }
     }
   } catch (err) {
