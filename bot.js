@@ -114,8 +114,8 @@ bot.on("ready", () => {
                   if (admin.loop.get(guild.id) == 2) {
                     admin.loop.set(guild.id, 1);
                   }
+                  serverQueue.connection.dispatcher.end();
                   if (serverQueue.connection.dispatcher) {
-                    serverQueue.connection.dispatcher.end();
                     serverQueue.connection.dispatcher.setVolumeLogarithmic(
                       admin.serverVolumes.get(guild.id) / 50
                     );
