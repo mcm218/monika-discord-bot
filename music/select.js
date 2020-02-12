@@ -32,7 +32,14 @@ async function selectSong(message, serverQueue) {
       return;
     }
 
-    const song = admin.searchList.get(message.guild.id)[args[1]];
+    const song = {
+      user: {
+        avatar: message.author.avatar,
+        id: message.author.id,
+        username: message.author.username
+      },
+      ...admin.searchList.get(message.guild.id)[args[1]]
+    };
 
     if (!serverQueue) {
       // Creating the contract for our queue

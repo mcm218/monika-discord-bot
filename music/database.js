@@ -69,10 +69,16 @@ function pushQueue(gid, songs) {
     .doc("queue")
     .set({ queue: songs });
 }
-function pushUser(gid, id, displayName) {
+function pushUser(gid, user) {
   db.collection("guilds/" + gid + "/VC")
-    .doc(id)
-    .set({ id: id, displayName: displayName });
+    .doc(user.id)
+    .set({
+      avatar: user.user.avatar,
+      id: user.user.id,
+      username: user.user.username,
+      muted: user.selfMute,
+      deaf: user.selfDeaf
+    });
 }
 function pushController(gid, controller) {
   db.collection("guilds/" + gid + "/VC")

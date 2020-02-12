@@ -31,12 +31,20 @@ var bot = new Discord.Client();
 // Update DB whenever user joins/leaves VC
 bot.on("voiceStateUpdate", (oldMember, newMember) => {
   if (newMember.user.bot) return;
-  if (newMember.voiceChannel) {
+  if (
+    newMember.voiceChannel &&
+    newMember.voiceChannel != oldMember.voiceChannel
+  ) {
     console.log(newMember.displayName + " has joined the VC!");
-    db.pushUser(newMember.guild.id, newMember.id, newMember.displayName);
-  } else {
+    db.pushUser(newMember.guild.id, newMember);
+  } else if (
+    oldMember.voiceChannel &&
+    newMember.voiceChannel != oldMember.voiceChannel
+  ) {
     console.log(oldMember.displayName + " has left the VC...");
     db.popUser(oldMember.guild.id, oldMember.id);
+  } else {
+    db.pushUser(newMember.guild.id, newMember);
   }
 });
 
@@ -106,8 +114,8 @@ bot.on("ready", () => {
                   if (admin.loop.get(guild.id) == 2) {
                     admin.loop.set(guild.id, 1);
                   }
-                  serverQueue.connection.dispatcher.end();
                   if (serverQueue.connection.dispatcher) {
+                    serverQueue.connection.dispatcher.end();
                     serverQueue.connection.dispatcher.setVolumeLogarithmic(
                       admin.serverVolumes.get(guild.id) / 50
                     );
@@ -340,7 +348,7 @@ bot.on("message", (message) => {
       ) {
         message.channel.send("<:JustMonika:664559827342852101>");
       } else if (message.content.match(/dnd/i)) {
-        const index = Math.floor(Math.random() * 3);
+        const index = Math.floor(Math.random() * 4);
         switch (index) {
           case 0:
             message.channel.send(copypastas.ankles);
@@ -351,6 +359,9 @@ bot.on("message", (message) => {
           case 2:
             message.channel.send(copypastas.delete);
             break;
+          case 3:
+            message.channel.send(copypastas.milk);
+            break;
         }
       } else if (message.content.match(/ankles/i)) {
         message.channel.send(copypastas.ankles);
@@ -358,6 +369,8 @@ bot.on("message", (message) => {
         message.channel.send(copypastas.dva);
       } else if (message.content.match(/delete/i)) {
         message.channel.send(copypastas.delete);
+      } else if (message.content.match(/milk/i)) {
+        message.channel.send(copypastas.milk);
       }
     }
   } catch (err) {
