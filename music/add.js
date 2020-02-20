@@ -219,7 +219,7 @@ async function addSongToQueue(videoUrl, message, serverQueue, voiceChannel) {
   var thumbnail =
     songInfo.player_response.videoDetails.thumbnail.thumbnails[
       songInfo.player_response.videoDetails.thumbnail.thumbnails.length - 1
-    ];
+    ].url;
   console.log(message.author);
   const song = {
     user: {
