@@ -9,7 +9,7 @@ function playSong(message, song) {
     serverQueue.voiceChannel.leave();
     admin.queue.delete(message.guild.id);
     db.pushQueue(message.guild.id, []);
-    message.channel.send("Bye!");
+    message.channel.send("bye-bye nyaa-ow (^^)/!");
     return;
   }
   db.pushQueue(message.guild.id, serverQueue.songs);
@@ -72,7 +72,7 @@ function dbPlaySong(channel, serverQueue) {
         if (serverQueue.songs[0]) {
           channel.send(`Now playing: ${serverQueue.songs[0].title}`);
         } else {
-          channel.send("Bye!");
+          channel.send("bye-bye nyaa~~ (^^)/");
         }
         dbPlaySong(channel, serverQueue);
       }, 1000);
