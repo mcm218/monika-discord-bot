@@ -97,56 +97,22 @@ bot.on("ready", () => {
             admin.queue.set(guild.id, serverQueue);
           }
           const dbQueue = doc.data() ? doc.data().queue : [];
-          var songShift = true;
-          var i = 0;
-          // checks if song is missing from db (need to remove)
-          for (let a of serverQueue.songs) {
-            var found = false;
-            for (let b of dbQueue) {
-              if (a.id == b.id) {
-                found = true;
-                break;
-              }
+          // IF serverQueue.songs[0].id != dbQueue[0].id
+          // Need to change currently playing
+          if (
+            serverQueue.songs.length > 0 &&
+            dbQueue.length > 0 &&
+            serverQueue.songs[0].id != dbQueue[0].id
+          ) {
+            // insert dbQueue to serverQueue.songs[1]
+            const old = serverQueue.songs[0];
+            const current = dbQueue;
+            serverQueue.songs = [old, ...current];
+            if (serverQueue.connection.dispatcher) {
+              serverQueue.connection.dispatcher.end();
             }
-            if (!found) {
-              if (i == 0) {
-                if (serverQueue) {
-                  if (admin.loop.get(guild.id) == 2) {
-                    admin.loop.set(guild.id, 1);
-                  }
-                  serverQueue.connection.dispatcher.end();
-                  if (serverQueue.connection.dispatcher) {
-                    serverQueue.connection.dispatcher.setVolumeLogarithmic(
-                      admin.serverVolumes.get(guild.id) / 50
-                    );
-                  }
-                }
-              } else {
-                var removed = serverQueue.songs.splice(i, 1)[0];
-                console.log(removed);
-              }
-              songShift = false;
-            } else {
-              i++;
-            }
-          }
-          //checks if song is missing from server (need to add)
-          for (let b of dbQueue) {
-            i = 0;
-            var found = false;
-            for (let a of serverQueue.songs) {
-              if (a.id == b.id) {
-                found = true;
-                break;
-              }
-              i++;
-            }
-            if (!found) {
-              serverQueue.songs.splice(i, 0, b);
-              songShift = false;
-            }
-          }
-          if (songShift) {
+            // ELSE set serverQueue.songs = dbQueue
+          } else {
             serverQueue.songs = dbQueue;
           }
           if (init) {
@@ -183,7 +149,7 @@ bot.on("ready", () => {
               if (serverQueue && serverQueue.connection) {
                 const dispatcher = serverQueue.connection.dispatcher;
                 dispatcher.setVolumeLogarithmic(volume / 50);
-                musicChannel.send("Volume: " + volume);
+                // musicChannel.send("Volume: " + volume);
               }
             }
             if (dbController.shuffleMode != admin.shuffleMode.get(guild.id)) {

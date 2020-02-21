@@ -16,26 +16,31 @@ function playSong(message, song) {
   const dispatcher = serverQueue.connection
     .playStream(ytdl(song.url))
     .on("end", () => {
-      switch (admin.loop.get(message.guild.id)) {
-        case 0: // no looping
-          serverQueue.songs.shift();
-          break;
-        case 1: // queue looping
-          serverQueue.songs.push(serverQueue.songs[0]);
-          serverQueue.songs.shift();
-          break;
-        case 2: // song looping
-          break;
-      }
-      display.current(message, serverQueue);
-      playSong(message, serverQueue.songs[0]);
+      setTimeout(() => {
+        switch (admin.loop.get(message.guild.id)) {
+          case 0: // no looping
+            serverQueue.songs.shift();
+            break;
+          case 1: // queue looping
+            serverQueue.songs.push(serverQueue.songs[0]);
+            serverQueue.songs.shift();
+            break;
+          case 2: // song looping
+            break;
+        }
+        display.current(message, serverQueue);
+        playSong(message, serverQueue.songs[0]);
+      }, 1000);
+    })
+    .on("start", () => {
+      console.log(serverQueue.songs[0]);
     })
     .on("error", (error) => {
       console.error(error);
     });
-  if (admin.pauseState.get(message.guild.id)) {
-    dispatcher.pause();
-  }
+  // if (admin.pauseState.get(message.guild.id)) {
+  //   dispatcher.pause();
+  // }
   const volume = admin.serverVolumes.get(message.guild.id);
   dispatcher.setVolumeLogarithmic(volume / 50);
 }
@@ -47,37 +52,43 @@ function dbPlaySong(channel, serverQueue) {
     db.pushQueue(channel.guild.id, []);
     return;
   }
+  console.log(`Now playing: ${serverQueue.songs[0].title}`);
   db.pushQueue(channel.guild.id, serverQueue.songs);
-  console.log(serverQueue.songs[0].url);
   const dispatcher = serverQueue.connection
     .playStream(ytdl(serverQueue.songs[0].url))
     .on("end", () => {
-      switch (admin.loop.get(channel.guild.id)) {
-        case 0: // no looping
-          serverQueue.songs.shift();
-          break;
-        case 1: // queue looping
-          serverQueue.songs.push(serverQueue.songs[0]);
-          serverQueue.songs.shift();
-          break;
-        case 2: // song looping
-          break;
-      }
-      if (serverQueue.songs[0]) {
-        channel.send(`Now playing: ${serverQueue.songs[0].title}`);
-      } else {
-        channel.send("Bye!");
-      }
-      dbPlaySong(channel, serverQueue);
+      setTimeout(() => {
+        switch (admin.loop.get(channel.guild.id)) {
+          case 0: // no looping
+            serverQueue.songs.shift();
+            break;
+          case 1: // queue looping
+            serverQueue.songs.push(serverQueue.songs[0]);
+            serverQueue.songs.shift();
+            break;
+          case 2: // song looping
+            break;
+        }
+        if (serverQueue.songs[0]) {
+          channel.send(`Now playing: ${serverQueue.songs[0].title}`);
+        } else {
+          channel.send("Bye!");
+        }
+        dbPlaySong(channel, serverQueue);
+      }, 1000);
+    })
+    .on("start", () => {
+      console.log("Database: " + serverQueue.songs[0].url);
     })
     .on("error", (error) => {
       console.error(error);
     });
-  if (admin.pauseState.get(channel.guild.id)) {
-    dispatcher.pause();
-  }
+  // if (admin.pauseState.get(channel.guild.id)) {
+  //   dispatcher.pause();
+  // }
   const volume = admin.serverVolumes.get(channel.guild.id);
   dispatcher.setVolumeLogarithmic(volume / 50);
+  dispatcher.resume();
 }
 module.exports = {
   playSong: playSong,
