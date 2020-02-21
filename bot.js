@@ -104,6 +104,7 @@ bot.on("ready", () => {
             dbQueue.length > 0 &&
             serverQueue.songs[0].id != dbQueue[0].id
           ) {
+            console.log("Playing new song...");
             // insert dbQueue to serverQueue.songs[1]
             const old = serverQueue.songs[0];
             const current = dbQueue;
@@ -113,12 +114,21 @@ bot.on("ready", () => {
             }
             // ELSE set serverQueue.songs = dbQueue
           } else {
+            console.log("Different change...");
             serverQueue.songs = dbQueue;
+            if (!serverQueue.connection.dispatcher) {
+              play.dbPlaySong(musicChannel, serverQueue);
+            }
+            if (dbQueue.length == 0) {
+              if (serverQueue.connection.dispatcher) {
+                console.log("Ending!");
+                serverQueue.connection.dispatcher.end();
+              }
+            }
           }
           if (init) {
             // Calling the play function to start a song
             admin.queue.set(guild.id, serverQueue);
-            play.dbPlaySong(musicChannel, serverQueue);
           }
         } catch (err) {
           console.error(err);
