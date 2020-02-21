@@ -67,10 +67,13 @@ function dbPlaySong(channel, serverQueue) {
           switch (admin.loop.get(channel.guild.id)) {
             case 0: // no looping
               updatedQueue.shift();
+              serverQueue.songs.shift();
               break;
             case 1: // queue looping
-              updatedQueue.push(serverQueue.songs[0]);
+              updatedQueue.push(updatedQueue[0]);
               updatedQueue.shift();
+              serverQueue.songs.push(serverQueue.songs[0]);
+              serverQueue.songs.shift();
               break;
             case 2: // song looping
               // will need to be fixed

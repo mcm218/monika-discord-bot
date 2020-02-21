@@ -127,7 +127,7 @@ bot.on("ready", () => {
             }
           }
           console.log(serverQueue.songs.length);
-          if (init && serverQueue.songs.length == 1) {
+          if (init && serverQueue.songs.length > 0) {
             // Calling the play function to start a song
             admin.queue.set(guild.id, serverQueue);
             console.log("Starting new dispatcher");
