@@ -70,7 +70,7 @@ bot.on("ready", () => {
     });
 
     if (!queueObserver) {
-      queueObserver = queueRef.onSnapshot(async (doc) => {
+      queueObserver = queueRef.onSnapshot(async (docs) => {
         try {
           var serverQueue = admin.queue.get(guild.id);
           var init = false;
@@ -94,9 +94,12 @@ bot.on("ready", () => {
               // Printing the error message if the bot fails to join the voicechat
               console.log(err);
             }
-            admin.queue.set(guild.id, serverQueue);
           }
-          const dbQueue = doc.data() ? doc.data().queue : [];
+          const dbQueue = [];
+          docs.forEach((doc) => {
+            dbQueue.push(doc.data());
+          });
+          dbQueue.sort((a, b) => a.pos - b.pos);
           // IF serverQueue.songs[0].id != dbQueue[0].id
           // Need to change currently playing
           if (
@@ -110,15 +113,12 @@ bot.on("ready", () => {
             const current = dbQueue;
             serverQueue.songs = [old, ...current];
             if (serverQueue.connection.dispatcher) {
+              console.log("Starting new song!");
               serverQueue.connection.dispatcher.end();
             }
             // ELSE set serverQueue.songs = dbQueue
           } else {
-            console.log("Different change...");
             serverQueue.songs = dbQueue;
-            if (!serverQueue.connection.dispatcher) {
-              play.dbPlaySong(musicChannel, serverQueue);
-            }
             if (dbQueue.length == 0) {
               if (serverQueue.connection.dispatcher) {
                 console.log("Ending!");
@@ -126,9 +126,12 @@ bot.on("ready", () => {
               }
             }
           }
-          if (init) {
+          console.log(serverQueue.songs.length);
+          if (init && serverQueue.songs.length == 1) {
             // Calling the play function to start a song
             admin.queue.set(guild.id, serverQueue);
+            console.log("Starting new dispatcher");
+            play.dbPlaySong(musicChannel, serverQueue);
           }
         } catch (err) {
           console.error(err);
@@ -251,20 +254,17 @@ bot.on("message", (message) => {
           printCommands.printCommands(message);
           break;
         case "add":
-          add.addSong(message, serverQueue);
+          message.channel.send("I'll break your nico-nico knees");
+          // add.addSong(message, serverQueue);
           break;
         case "remove":
-          queueController.remove(message, serverQueue);
+          // queueController.remove(message, serverQueue);
           break;
         case "shift":
-          queueController.shift(message, serverQueue);
+          // queueController.shift(message, serverQueue);
           break;
         case "shuffle":
-          if (args[1] && args[1] === "mode") {
-            queueController.toggleShuffle(message);
-          } else {
-            queueController.shuffle(message, serverQueue);
-          }
+          queueController.shuffle(message, serverQueue);
           break;
         case "pause":
           playback.pause(message, serverQueue);
@@ -280,12 +280,12 @@ bot.on("message", (message) => {
           playback.resume(message, serverQueue);
           break;
         case "skip":
-          playback.skip(
-            admin.loop.get(message.guild.id),
-            admin.serverVolumes.get(message.guild.id),
-            message,
-            serverQueue
-          );
+          // playback.skip(
+          //   admin.loop.get(message.guild.id),
+          //   admin.serverVolumes.get(message.guild.id),
+          //   message,
+          //   serverQueue
+          // );
           break;
         case "stop":
           playback.stop(admin.loop.get(message.guild.id), message, serverQueue);

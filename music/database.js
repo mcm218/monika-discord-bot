@@ -65,9 +65,44 @@ async function getSearchSingle(playlist, search) {
 }
 
 function pushQueue(gid, songs) {
-  db.collection("guilds/" + gid + "/VC")
-    .doc("queue")
-    .set({ queue: songs });
+  console.log("Updating queue: ");
+  console.log(songs);
+  const path = "guilds/" + gid + "/VC/queue/songs";
+  let i = 0;
+  let batch = db.batch();
+  songs.forEach((song) => {
+    song.pos = i;
+    db.collection(path)
+      .doc(i.toString())
+      .set(song);
+    i++;
+  });
+  batch.commit();
+}
+function updateQueue(gid, songs) {
+  console.log("Updating queue ");
+  const path = "guilds/" + gid + "/VC/queue/songs";
+  const pos = songs.length;
+  db.collection(path)
+    .doc(pos.toString())
+    .delete();
+  let i = 0;
+  let batch = db.batch();
+  songs.forEach((song) => {
+    song.pos = i;
+    db.collection(path)
+      .doc(i.toString())
+      .set(song);
+    i++;
+  });
+  batch.commit();
+}
+function removeLast(gid, pos) {
+  const path = "guilds/" + gid + "/VC/queue/songs";
+  console.log("Removing " + pos);
+  db.collection(path)
+    .doc(pos.toString())
+    .delete();
 }
 function pushUser(gid, user) {
   db.collection("guilds/" + gid + "/VC")
@@ -91,7 +126,7 @@ function popUser(gid, id) {
     .delete();
 }
 function getQueueRef(gid) {
-  return db.collection("guilds/" + gid + "/VC/").doc("queue");
+  return db.collection("guilds/" + gid + "/VC/queue/songs");
 }
 function getControllerRef(gid) {
   return db.collection("guilds/" + gid + "/VC/").doc("controller");
@@ -106,5 +141,7 @@ module.exports = {
   pushController: pushController,
   popUser: popUser,
   getQueueRef: getQueueRef,
-  getControllerRef: getControllerRef
+  getControllerRef: getControllerRef,
+  removeLast: removeLast,
+  updateQueue: updateQueue
 };

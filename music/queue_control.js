@@ -76,6 +76,7 @@ function shuffle(message, serverQueue) {
     serverQueue.songs[j] = temp;
   }
   serverQueue.songs.unshift(song[0]);
+  db.pushQueue(message.guild.id, serverQueue.songs);
   message.channel.send("Shuffled!");
 }
 

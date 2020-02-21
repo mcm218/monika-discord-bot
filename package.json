@@ -12,6 +12,7 @@
         "google-auth-library": "^5.9.2",
         "googleapis": "^47.0.0",
         "grpc": "^1.24.2",
+        "localtunnel": "^2.0.0",
         "node-opus": "^0.3.3",
         "opusscript": "0.0.7",
         "request": "^2.88.0",

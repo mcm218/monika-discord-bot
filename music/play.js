@@ -9,14 +9,16 @@ function playSong(message, song) {
     serverQueue.voiceChannel.leave();
     admin.queue.delete(message.guild.id);
     db.pushQueue(message.guild.id, []);
-    message.channel.send("bye-bye nyaa-ow (^^)/!");
+    message.channel.send("bye-bye nyaa (^^)/");
     return;
   }
+  var stream = ytdl(song.url, { quality: 140 });
   db.pushQueue(message.guild.id, serverQueue.songs);
   const dispatcher = serverQueue.connection
-    .playStream(ytdl(song.url))
+    .playStream(stream)
     .on("end", () => {
       setTimeout(() => {
+        const pos = serverQueue.songs.length - 1;
         switch (admin.loop.get(message.guild.id)) {
           case 0: // no looping
             serverQueue.songs.shift();
@@ -30,6 +32,7 @@ function playSong(message, song) {
         }
         display.current(message, serverQueue);
         playSong(message, serverQueue.songs[0]);
+        // db.removeLast(message.guild.id, pos);
       }, 1000);
     })
     .on("start", () => {
@@ -46,49 +49,54 @@ function playSong(message, song) {
 }
 
 function dbPlaySong(channel, serverQueue) {
-  if (!serverQueue.songs[0]) {
-    admin.queue.delete(channel.guild.id);
+  // If there are no songs, delete the serverQueue, leave voice, and delete queue
+  if (serverQueue.songs.length == 0) {
     serverQueue.voiceChannel.leave();
-    db.pushQueue(channel.guild.id, []);
+    admin.queue.delete(channel.guild.id);
     return;
   }
-  console.log(`Now playing: ${serverQueue.songs[0].title}`);
-  db.pushQueue(channel.guild.id, serverQueue.songs);
-  const dispatcher = serverQueue.connection
-    .playStream(ytdl(serverQueue.songs[0].url))
-    .on("end", () => {
-      setTimeout(() => {
-        switch (admin.loop.get(channel.guild.id)) {
-          case 0: // no looping
-            serverQueue.songs.shift();
-            break;
-          case 1: // queue looping
-            serverQueue.songs.push(serverQueue.songs[0]);
-            serverQueue.songs.shift();
-            break;
-          case 2: // song looping
-            break;
-        }
-        if (serverQueue.songs[0]) {
-          channel.send(`Now playing: ${serverQueue.songs[0].title}`);
-        } else {
-          channel.send("bye-bye nyaa~~ (^^)/");
-        }
-        dbPlaySong(channel, serverQueue);
-      }, 1000);
-    })
-    .on("start", () => {
-      console.log("Database: " + serverQueue.songs[0].url);
-    })
-    .on("error", (error) => {
-      console.error(error);
-    });
-  // if (admin.pauseState.get(channel.guild.id)) {
-  //   dispatcher.pause();
-  // }
-  const volume = admin.serverVolumes.get(channel.guild.id);
-  dispatcher.setVolumeLogarithmic(volume / 50);
-  dispatcher.resume();
+  const stream = ytdl(serverQueue.songs[0].url, {
+    quality: 140
+  }).on("response", () => {
+    console.log("Downloading...");
+    const dispatcher = serverQueue.connection
+      .playStream(stream)
+      .on("end", () => {
+        setTimeout(() => {
+          const updatedQueue = [...serverQueue.songs];
+          switch (admin.loop.get(channel.guild.id)) {
+            case 0: // no looping
+              updatedQueue.shift();
+              break;
+            case 1: // queue looping
+              updatedQueue.push(serverQueue.songs[0]);
+              updatedQueue.shift();
+              break;
+            case 2: // song looping
+              // will need to be fixed
+              break;
+          }
+          if (updatedQueue[0]) {
+            channel.send(`Now playing: ${updatedQueue[0].title}`);
+          } else {
+            channel.send("bye");
+          }
+          db.updateQueue(channel.guild.id, updatedQueue);
+        }, 1000);
+      })
+      .on("start", () => {
+        console.log("Database: " + serverQueue.songs[0].url);
+      })
+      .on("error", (error) => {
+        console.error(error);
+      });
+    // if (admin.pauseState.get(channel.guild.id)) {
+    //   dispatcher.pause();
+    // }
+    const volume = admin.serverVolumes.get(channel.guild.id);
+    dispatcher.setVolumeLogarithmic(volume / 50);
+    dispatcher.resume();
+  });
 }
 module.exports = {
   playSong: playSong,
