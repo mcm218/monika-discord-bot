@@ -2,6 +2,8 @@ const queueObservers = new Map();
 const queue = new Map();
 const connection = new Map();
 const playing = new Map();
+const time = new Map();
+const duration = new Map();
 const controllerObservers = new Map();
 var searchList = new Map();
 const loop = new Map();
@@ -24,5 +26,6 @@ module.exports = {
   serverVolumes,
   youtubeKey,
   connection,
-  playing
+  playing,
+  time
 };
