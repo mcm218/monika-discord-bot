@@ -75,6 +75,7 @@ async function play(gid, queue) {
     const time = Date();
     const durPlayed = (parseInt(time, 10) - parseInt(admin.time.get(gid), 10)) / 1000;
     console.log(durPlayed + "/" + admin.duration.get(gid));
+    console.log((100 * durPlayed / admin.duration.get(gid)) + "%");
     admin.playing.set(gid, false);
     queue.shift();
     play(gid, queue);
