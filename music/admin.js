@@ -23,5 +23,6 @@ module.exports = {
   pauseState,
   serverVolumes,
   youtubeKey,
-  connection
+  connection,
+  playing
 };
