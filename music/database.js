@@ -32,14 +32,13 @@ function getQueue(gid, musicChannel) {
       admin.connection.set(gid, connection);
     }
     // If no playing value found or playing is false
-    if (queue.length > 0 && (!admin.playing.has(gid) || !admin.playing.get(gid))) {
+    if (queue.length != 0 && (!admin.playing.has(gid) || !admin.playing.get(gid))) {
       play(gid, queue);
     }
   });
 }
 
 function updateQueue(gid, songs) {
-  console.log("Updating queue ");
   const path = "guilds/" + gid + "/VC/queue/songs";
   const pos = songs.length;
   let batch = db.batch();
@@ -58,16 +57,18 @@ function updateQueue(gid, songs) {
 }
 
 async function play(gid, queue) {
-  if (queue.length != 0) {
-    updateQueue(queue);
+  if (queue.length == 0) {
+    updateQueue(gid, []);
     return;
   }
   admin.playing.set(gid, true);
-  updateQueue(queue);
+  updateQueue(gid, queue);
   console.log("Now playing: " + queue[0].title)
   const stream = await ytdl(queue[0].url);
+  const connection = admin.connection.get(gid);
   const dispatcher = connection.playOpusStream(stream).on("end", () => {
     const queue = admin.queue.get(gid);
+    console.log(queue[0].title + " has ended");
     admin.playing.set(gid, false);
     queue.shift();
     play(gid, queue);
