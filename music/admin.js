@@ -27,5 +27,6 @@ module.exports = {
   youtubeKey,
   connection,
   playing,
-  time
+  time,
+  duration
 };
