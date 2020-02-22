@@ -33,18 +33,8 @@ function getQueue(gid, musicChannel) {
     }
     // If no playing value found or playing is false
     if (queue.length > 0 && (!admin.playing.has(gid) || !admin.playing.get(gid))) {
-      admin.playing.set(gid, true);
-      console.log("Now playing: " + queue[0].title)
-      const stream = await ytdl(queue[0].url);
-      const dispatcher = connection.playOpusStream(stream).on("end", () => {
-        const queue = admin.queue.get(gid);
-        admin.playing.set(gid, false);
-        queue.shift();
-        updateQueue(gid, queue);
-      });
-      dispatcher.setVolumeLogarithmic(1);
+      play(gid, queue);
     }
-
   });
 }
 
@@ -65,6 +55,24 @@ function updateQueue(gid, songs) {
     i++;
   });
   batch.commit();
+}
+
+function play(gid, queue) {
+  if (queue.length != 0) {
+    updateQueue(queue);
+    return;
+  }
+  admin.playing.set(gid, true);
+  updateQueue(queue);
+  console.log("Now playing: " + queue[0].title)
+  const stream = await ytdl(queue[0].url);
+  const dispatcher = connection.playOpusStream(stream).on("end", () => {
+    const queue = admin.queue.get(gid);
+    admin.playing.set(gid, false);
+    queue.shift();
+    play(gid, queue);
+  });
+  dispatcher.setVolumeLogarithmic(1);
 }
 
 
