@@ -66,7 +66,8 @@ async function play(gid, queue) {
   console.log("Now playing: " + queue[0].title)
   admin.time.set(gid, Date());
   const info = await ytdl.getBasicInfo(queue[0].url);
-  admin.duration.set(gid, info.streamingData.approxDurationMs);
+  console.log(info);
+  admin.duration.set(gid, info.approxDurationMs);
   const stream = await ytdl(queue[0].url);
   const connection = admin.connection.get(gid);
   const dispatcher = connection.playOpusStream(stream).on("end", () => {
