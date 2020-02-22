@@ -57,7 +57,7 @@ function updateQueue(gid, songs) {
   batch.commit();
 }
 
-function play(gid, queue) {
+async function play(gid, queue) {
   if (queue.length != 0) {
     updateQueue(queue);
     return;
