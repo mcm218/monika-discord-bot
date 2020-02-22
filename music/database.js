@@ -79,6 +79,9 @@ async function play(gid, queue) {
     admin.playing.set(gid, false);
     queue.shift();
     play(gid, queue);
+  }).on("error", error => {
+    console.log(error);
+    play(gid, queue);
   });
   dispatcher.setVolumeLogarithmic(1);
 }
