@@ -3,7 +3,7 @@
 var firebase = require("firebase/app");
 const auth = require("../auth.json");
 const admin = require("./admin.js")
-const ytdl = require('ytdl-core-discord');
+const ytdl = require('ytdl-core');
 // Add the Firebase products that you want to use
 require("firebase/firestore");
 
@@ -69,7 +69,7 @@ async function play(gid, queue) {
   const stream = await ytdl(queue[0].url);
   const connection = admin.connection.get(gid);
   console.log("Starting stream, length: " + info.length_seconds);
-  const dispatcher = connection.playOpusStream(stream).on("start", () => {
+  const dispatcher = connection.playStream(stream).on("start", () => {
     admin.time.set(gid, Date.now());
   }).on("end", () => {
     const queue = admin.queue.get(gid);
