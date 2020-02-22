@@ -64,7 +64,7 @@ async function play(gid, queue) {
   admin.playing.set(gid, true);
   updateQueue(gid, queue);
   console.log("Now playing: " + queue[0].title)
-  admin.time.set(gid, Date());
+  admin.time.set(gid, Date.now());
   const info = await ytdl.getBasicInfo(queue[0].url);
   admin.duration.set(gid, info.length_seconds);
   const stream = await ytdl(queue[0].url);
@@ -72,8 +72,8 @@ async function play(gid, queue) {
   const dispatcher = connection.playOpusStream(stream).on("end", () => {
     const queue = admin.queue.get(gid);
     console.log(queue[0].title + " has ended");
-    const time = Date();
-    const durPlayed = (parseInt(time, 10) - parseInt(admin.time.get(gid), 10)) / 1000;
+    const time = Date.now();
+    const durPlayed = (time - admin.time.get(gid)) / 1000;
     console.log(durPlayed + "/" + admin.duration.get(gid));
     console.log((100 * durPlayed / admin.duration.get(gid)) + "%");
     admin.playing.set(gid, false);
