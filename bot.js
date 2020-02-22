@@ -203,7 +203,7 @@ bot.on("message", (message) => {
         }
       } else if (message.content.match(/ankles/i)) {
         message.channel.send(copypastas.ankles);
-      } else if (message.content.match(/dva|d.va/i)) {
+      } else if (message.content.match(/dva/i)) {
         message.channel.send(copypastas.dva);
       } else if (message.content.match(/delete/i)) {
         message.channel.send(copypastas.delete);
@@ -211,7 +211,7 @@ bot.on("message", (message) => {
         message.channel.send(copypastas.milk);
       } else if (message.content.match(/girl/i)) {
         message.channel.send("<:alexiscoming:677231662173519873>");
-      } else if (message.content.match(/brap|fart|smell/i)) {
+      } else if (message.content.match(/brap/i)) {
         message.channel.send(undefined, { files: "https://i.redd.it/kk51ksap2ye31.png" })
       }
     }
