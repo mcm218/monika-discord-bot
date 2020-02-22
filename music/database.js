@@ -32,7 +32,7 @@ function getQueue(gid, musicChannel) {
       admin.connection.set(gid, connection);
     }
     // If no playing value found or playing is false
-    if (!admin.playing.has(gid) || !admin.playing.get(gid)) {
+    if (queue.length > 0 && (!admin.playing.has(gid) || !admin.playing.get(gid))) {
       admin.playing.set(gid, true);
       console.log("Now playing: " + queue[0].title)
       const stream = await ytdl(queue[0].url);
@@ -52,11 +52,11 @@ function updateQueue(gid, songs) {
   console.log("Updating queue ");
   const path = "guilds/" + gid + "/VC/queue/songs";
   const pos = songs.length;
+  let batch = db.batch();
   db.collection(path)
     .doc(pos.toString())
     .delete();
   let i = 0;
-  let batch = db.batch();
   songs.forEach((song) => {
     song.pos = i;
     db.collection(path)
