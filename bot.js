@@ -184,7 +184,7 @@ bot.on("message", (message) => {
       ) {
         message.channel.send("<:JustMonika:664559827342852101>");
       } else if (message.content.match(/dnd/i)) {
-        const index = Math.floor(Math.random() * 5);
+        const index = Math.floor(Math.random() * 6);
         switch (index) {
           case 0:
             message.channel.send(copypastas.ankles);
@@ -199,6 +199,9 @@ bot.on("message", (message) => {
             message.channel.send(copypastas.milk);
             break;
           case 4:
+            message.channel.send(copypastas.brap);
+            break;
+          case 5:
             message.channel.send(undefined, { files: "https://i.redd.it/kk51ksap2ye31.png" })
         }
       } else if (message.content.match(/ankles/i)) {
@@ -211,8 +214,10 @@ bot.on("message", (message) => {
         message.channel.send(copypastas.milk);
       } else if (message.content.match(/girl/i)) {
         message.channel.send("<:alexiscoming:677231662173519873>");
-      } else if (message.content.match(/brap/i)) {
-        message.channel.send(undefined, { files: ["https://i.redd.it/kk51ksap2ye31.png"] })
+      } else if (message.content.match(/smell/i)) {
+        message.channel.send(copypastas.brap, { files: ["https://i.redd.it/kk51ksap2ye31.png"] })
+      } else if (message.content.match(/brap/i) || message.content.match(/fart/i)) {
+        message.channel.send(copypastas.brap, { files: ["https://i.redd.it/kk51ksap2ye31.png"] })
       }
     }
   } catch (err) {
