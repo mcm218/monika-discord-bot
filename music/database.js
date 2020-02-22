@@ -33,7 +33,7 @@ function getQueue(gid, musicChannel) {
     // If there are songs in the queue and not currently playing a song
     if (queue.length > 0 && (!admin.connection.dispatcher)) {
       console.log("Now playing: " + queue[0].title)
-      const stream = await ytdl(song.url, { quality: 140 });
+      const stream = await ytdl(queue[0].url, { quality: 140 });
       const dispatcher = serverQueue.connection.playOpusStream(stream).on("end", () => {
         const queue = admin.queue.get(gid);
         queue.shift();
