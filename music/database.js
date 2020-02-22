@@ -64,13 +64,14 @@ async function play(gid, queue) {
   admin.playing.set(gid, true);
   updateQueue(gid, queue);
   console.log("Now playing: " + queue[0].title)
-  admin.time.set(gid, Date.now());
   const info = await ytdl.getBasicInfo(queue[0].url);
   admin.duration.set(gid, info.length_seconds);
   const stream = await ytdl(queue[0].url);
   const connection = admin.connection.get(gid);
   console.log("Starting stream, length: " + info.length_seconds);
-  const dispatcher = connection.playOpusStream(stream).on("end", () => {
+  const dispatcher = connection.playOpusStream(stream).on("start", () => {
+    admin.time.set(gid, Date.now());
+  }).on("end", () => {
     const queue = admin.queue.get(gid);
     console.log(queue[0].title + " has ended");
     const time = Date.now();
