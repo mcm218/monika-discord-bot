@@ -212,7 +212,7 @@ bot.on("message", (message) => {
       } else if (message.content.match(/girl/i)) {
         message.channel.send("<:alexiscoming:677231662173519873>");
       } else if (message.content.match(/brap/i)) {
-        message.channel.send(undefined, { files: "https://i.redd.it/kk51ksap2ye31.png" })
+        message.channel.send(undefined, { files: ["https://i.redd.it/kk51ksap2ye31.png"] })
       }
     }
   } catch (err) {
