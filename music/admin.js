@@ -1,6 +1,7 @@
 const queueObservers = new Map();
 const queue = new Map();
 const connection = new Map();
+const playing = new Map();
 const controllerObservers = new Map();
 var searchList = new Map();
 const loop = new Map();

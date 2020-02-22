@@ -31,12 +31,14 @@ function getQueue(gid, musicChannel) {
       connection = await musicChannel.join();
       admin.connection.set(gid, connection);
     }
-    // If there are songs in the queue and not currently playing a song
-    if (queue.length > 0 && (admin.connection.dispatcher.destroyed)) {
+    // If no playing value found or playing is false
+    if (!admin.playing.has(gid) || !admin.playing.get(gid)) {
+      admin.playing.set(gid, true);
       console.log("Now playing: " + queue[0].title)
       const stream = await ytdl(queue[0].url);
-      const dispatcher = serverQueue.connection.playOpusStream(stream).on("end", () => {
+      const dispatcher = connection.playOpusStream(stream).on("end", () => {
         const queue = admin.queue.get(gid);
+        admin.playing.set(gid, false);
         queue.shift();
         updateQueue(gid, queue);
       });
@@ -64,7 +66,6 @@ function updateQueue(gid, songs) {
   });
   batch.commit();
 }
-
 
 
 function pushSearch(playlist, search, results) {
