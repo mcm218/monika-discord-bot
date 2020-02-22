@@ -1,15 +1,70 @@
 // Firebase App (the core Firebase SDK) is always required and
 // must be listed before other Firebase SDKs
 var firebase = require("firebase/app");
-var auth = require("../auth.json");
+const auth = require("../auth.json");
+const admin = require("./admin.js")
+const ytdl = require('ytdl-core-discord');
 // Add the Firebase products that you want to use
 require("firebase/firestore");
 
 // Initialize Firebase
-var firebaseConfig = auth.firebaseConfig;
-firebase.initializeApp(firebaseConfig);
+const firebaseConfig = auth.firebaseConfig;
+const app = firebase.initializeApp(firebaseConfig);
 
-let db = firebase.firestore();
+let db = app.firestore();
+
+function getQueue(gid, musicChannel) {
+  const path = "guilds/" + gid + "/VC/queue/songs"
+  db.collection(path).onSnapshot(async (docs) => {
+    // Set up queue
+    const queue = [];
+    docs.forEach((doc) => {
+      queue.push(doc.data());
+    });
+    queue.sort((a, b) => a.pos - b.pos);
+    admin.queue.set(gid, queue);
+    // Set up voice channel
+    if (admin.connection.has(gid)) {
+      const connection = admin.connection.get(gid);
+    } else {
+      const connection = await musicChannel.join();
+      admin.connection.set(gid, connection);
+    }
+    // If there are songs in the queue and not currently playing a song
+    if (queue.length > 0 && (!admin.connection.dispatcher)) {
+      console.log("Now playing: " + queue[0].title)
+      const stream = await ytdl(song.url, { quality: 140 });
+      const dispatcher = serverQueue.connection.playOpusStream(stream).on("end", () => {
+        const queue = admin.queue.get(gid);
+        queue.shift();
+        updateQueue(gid, queue);
+      });
+      dispatcher.setVolumeLogarithmic(1);
+    }
+
+  });
+}
+
+function updateQueue(gid, songs) {
+  console.log("Updating queue ");
+  const path = "guilds/" + gid + "/VC/queue/songs";
+  const pos = songs.length;
+  db.collection(path)
+    .doc(pos.toString())
+    .delete();
+  let i = 0;
+  let batch = db.batch();
+  songs.forEach((song) => {
+    song.pos = i;
+    db.collection(path)
+      .doc(i.toString())
+      .set(song);
+    i++;
+  });
+  batch.commit();
+}
+
+
 
 function pushSearch(playlist, search, results) {
   var path;
@@ -79,24 +134,7 @@ function pushQueue(gid, songs) {
   });
   batch.commit();
 }
-function updateQueue(gid, songs) {
-  console.log("Updating queue ");
-  const path = "guilds/" + gid + "/VC/queue/songs";
-  const pos = songs.length;
-  db.collection(path)
-    .doc(pos.toString())
-    .delete();
-  let i = 0;
-  let batch = db.batch();
-  songs.forEach((song) => {
-    song.pos = i;
-    db.collection(path)
-      .doc(i.toString())
-      .set(song);
-    i++;
-  });
-  batch.commit();
-}
+
 function removeLast(gid, pos) {
   const path = "guilds/" + gid + "/VC/queue/songs";
   console.log("Removing " + pos);
@@ -143,5 +181,5 @@ module.exports = {
   getQueueRef: getQueueRef,
   getControllerRef: getControllerRef,
   removeLast: removeLast,
-  updateQueue: updateQueue
+  getQueue: getQueue
 };

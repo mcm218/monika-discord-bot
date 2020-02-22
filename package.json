@@ -8,15 +8,18 @@
         "bufferutil": "^4.0.1",
         "discord.js": "^11.5.1",
         "ffmpeg": "0.0.4",
-        "firebase": "^7.8.0",
-        "google-auth-library": "^5.9.2",
+        "firebase": "^7.9.1",
+        "google-auth-library": "^5.10.0",
         "googleapis": "^47.0.0",
         "grpc": "^1.24.2",
         "localtunnel": "^2.0.0",
         "node-opus": "^0.3.3",
         "opusscript": "0.0.7",
-        "request": "^2.88.0",
+        "request": "^2.88.2",
+        "rxfire": "^3.9.13",
+        "rxjs": "^6.5.4",
         "winston": "^3.2.1",
-        "ytdl-core": "^1.0.7"
+        "ytdl-core": "^1.0.9",
+        "ytdl-core-discord": "^1.1.0"
     }
 }

@@ -68,162 +68,8 @@ bot.on("ready", () => {
         voiceChannel = channel;
       }
     });
-
-    if (!queueObserver) {
-      queueObserver = queueRef.onSnapshot(async (docs) => {
-        try {
-          var serverQueue = admin.queue.get(guild.id);
-          var init = false;
-          if (!serverQueue) {
-            init = true;
-            const queueContruct = {
-              textChannel: musicChannel,
-              voiceChannel: voiceChannel,
-              connection: null,
-              songs: [],
-              volume: 5,
-              playing: true
-            };
-            // Setting the queue using our contract
-            serverQueue = queueContruct;
-            try {
-              // Here we try to join the voicechat and save our connection into our object.
-              var connection = await voiceChannel.join();
-              queueContruct.connection = connection;
-            } catch (err) {
-              // Printing the error message if the bot fails to join the voicechat
-              console.log(err);
-            }
-          }
-          const dbQueue = [];
-          docs.forEach((doc) => {
-            dbQueue.push(doc.data());
-          });
-          dbQueue.sort((a, b) => a.pos - b.pos);
-          // IF serverQueue.songs[0].id != dbQueue[0].id
-          // Need to change currently playing
-          if (
-            serverQueue.songs.length > 0 &&
-            dbQueue.length > 0 &&
-            serverQueue.songs[0].id != dbQueue[0].id
-          ) {
-            console.log("Playing new song...");
-            // insert dbQueue to serverQueue.songs[1]
-            const old = serverQueue.songs[0];
-            const current = dbQueue;
-            serverQueue.songs = [old, ...current];
-            if (serverQueue.connection.dispatcher) {
-              console.log("Starting new song!");
-              serverQueue.connection.dispatcher.end();
-            }
-            // ELSE set serverQueue.songs = dbQueue
-          } else {
-            serverQueue.songs = dbQueue;
-            if (dbQueue.length == 0) {
-              if (serverQueue.connection.dispatcher) {
-                console.log("Ending!");
-                serverQueue.connection.dispatcher.end();
-              }
-            }
-          }
-          console.log(serverQueue.songs.length);
-          if (init && serverQueue.songs.length > 0) {
-            // Calling the play function to start a song
-            admin.queue.set(guild.id, serverQueue);
-            console.log("Starting new dispatcher");
-            play.dbPlaySong(musicChannel, serverQueue);
-          }
-        } catch (err) {
-          console.error(err);
-        }
-      });
-      admin.queueObservers.set(guild.id, queueObserver);
-    }
-
-    var volume = admin.serverVolumes.get(guild.id);
-    if (!volume) {
-      admin.serverVolumes.set(guild.id, 7);
-      volume = 7;
-    }
-
-    var controllerObserver = admin.controllerObservers.get(guild.id);
-    if (!controllerObserver) {
-      controllerObserver = controllerRef.onSnapshot((doc) => {
-        try {
-          const dbController = doc.data();
-          const id = guild.id;
-          const serverQueue = admin.queue.get(id);
-          var volume = admin.serverVolumes.get(id);
-          if (dbController) {
-            //check for differences
-            if (dbController.volume != volume) {
-              volume = dbController.volume;
-              admin.serverVolumes.set(guild.id, volume);
-              if (serverQueue && serverQueue.connection) {
-                const dispatcher = serverQueue.connection.dispatcher;
-                dispatcher.setVolumeLogarithmic(volume / 50);
-                // musicChannel.send("Volume: " + volume);
-              }
-            }
-            if (dbController.shuffleMode != admin.shuffleMode.get(guild.id)) {
-              admin.shuffleMode.set(guild.id, dbController.shuffleMode);
-              if (admin.shuffleMode.get(guild.id)) {
-                musicChannel.send("Now in shuffle mode!");
-              } else {
-                musicChannel.send("No longer in shuffle mode.... :frowning:");
-              }
-            }
-            if (dbController.loop != admin.loop.get(guild.id)) {
-              var loop = dbController.loop;
-              admin.loop.set(guild.id, loop);
-              switch (loop) {
-                case 0:
-                  musicChannel.send("No longer looping!");
-                  break;
-                case 1:
-                  musicChannel.send("Now looping queue!");
-                  break;
-                case 2:
-                  musicChannel.send("Now looping song!");
-                  break;
-              }
-            }
-            if (dbController.pauseState != admin.pauseState.get(guild.id)) {
-              if (!serverQueue || !serverQueue.connection) {
-                admin.pauseState.set(guild.id, dbController.pauseState);
-              } else {
-                if (dbController.pauseState) {
-                  if (serverQueue.connection) {
-                    admin.pauseState.set(guild.id, true);
-                    serverQueue.connection.dispatcher.pause();
-                    musicChannel.send("Paused!");
-                  }
-                } else {
-                  if (serverQueue.connection) {
-                    admin.pauseState.set(guild.id, false);
-                    serverQueue.connection.dispatcher.resume();
-                    musicChannel.send("Resuming!");
-                  }
-                }
-              }
-            }
-          } else {
-            //upload controller
-            controllerRef.set({
-              volume: admin.serverVolumes.get(guild.id),
-              shuffleMode: admin.shuffleMode.get(guild.id),
-              loop: admin.loop.get(guild.id),
-              pauseState: false
-            });
-          }
-        } catch (err) {
-          console.error(err);
-        }
-      });
-      admin.controllerObservers.set(guild.id, controllerObserver);
-    }
+    db.getQueue(guild.id, voiceChannel);
   });
-
   logger.info("Connected");
   logger.info("Logged in as: ");
   logger.info(bot.user.tag);
@@ -251,35 +97,44 @@ bot.on("message", (message) => {
           message.channel.send("<:hangingsayori:665410228673839104>");
           break;
         case "commands":
-          printCommands.printCommands(message);
+          message.channel.send("I'll break your nico-nico knees");
+          // printCommands.printCommands(message);
           break;
         case "add":
           message.channel.send("I'll break your nico-nico knees");
           // add.addSong(message, serverQueue);
           break;
         case "remove":
+          message.channel.send("I'll break your nico-nico knees");
           // queueController.remove(message, serverQueue);
           break;
         case "shift":
+          message.channel.send("I'll break your nico-nico knees");
           // queueController.shift(message, serverQueue);
           break;
         case "shuffle":
-          queueController.shuffle(message, serverQueue);
+          message.channel.send("I'll break your nico-nico knees");
+          // queueController.shuffle(message, serverQueue);
           break;
         case "pause":
-          playback.pause(message, serverQueue);
+          message.channel.send("I'll break your nico-nico knees");
+          // playback.pause(message, serverQueue);
           break;
         case "search":
-          search.searchSong(message);
+          message.channel.send("I'll break your nico-nico knees");
+          // search.searchSong(message);
           break;
         case "select":
-          select.selectSong(message, serverQueue);
+          message.channel.send("I'll break your nico-nico knees");
+          // select.selectSong(message, serverQueue);
           break;
         case "play":
         case "resume":
-          playback.resume(message, serverQueue);
+          message.channel.send("I'll break your nico-nico knees");
+          // playback.resume(message, serverQueue);
           break;
         case "skip":
+          message.channel.send("I'll break your nico-nico knees");
           // playback.skip(
           //   admin.loop.get(message.guild.id),
           //   admin.serverVolumes.get(message.guild.id),
@@ -288,25 +143,30 @@ bot.on("message", (message) => {
           // );
           break;
         case "stop":
-          playback.stop(admin.loop.get(message.guild.id), message, serverQueue);
+          message.channel.send("I'll break your nico-nico knees");
+          // playback.stop(admin.loop.get(message.guild.id), message, serverQueue);
           break;
         case "now":
         case "current":
         case "song":
-          display.current(message, serverQueue);
+          message.channel.send("I'll break your nico-nico knees");
+          // display.current(message, serverQueue);
           break;
         case "next":
         case "nextsong":
-          display.next(message, serverQueue);
+          message.channel.send("I'll break your nico-nico knees");
+          // display.next(message, serverQueue);
           break;
         case "list":
-          display.list(message, serverQueue);
+          // display.list(message, serverQueue);
           break;
         case "volume":
-          playback.changeVolume(admin.serverVolumes, message, serverQueue);
+          message.channel.send("I'll break your nico-nico knees");
+          // playback.changeVolume(admin.serverVolumes, message, serverQueue);
           break;
         case "loop":
-          playback.toggleLoop(message);
+          message.channel.send("I'll break your nico-nico knees");
+          // playback.toggleLoop(message);
           break;
         default:
           message.channel.send("Sorry, I don't know that command...");
