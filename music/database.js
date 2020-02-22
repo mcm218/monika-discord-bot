@@ -24,16 +24,17 @@ function getQueue(gid, musicChannel) {
     queue.sort((a, b) => a.pos - b.pos);
     admin.queue.set(gid, queue);
     // Set up voice channel
+    var connection;
     if (admin.connection.has(gid)) {
-      const connection = admin.connection.get(gid);
+      connection = admin.connection.get(gid);
     } else {
-      const connection = await musicChannel.join();
+      connection = await musicChannel.join();
       admin.connection.set(gid, connection);
     }
     // If there are songs in the queue and not currently playing a song
-    if (queue.length > 0 && (!admin.connection.dispatcher)) {
+    if (queue.length > 0 && (admin.connection.dispatcher.destroyed)) {
       console.log("Now playing: " + queue[0].title)
-      const stream = await ytdl(queue[0].url, { quality: 140 });
+      const stream = await ytdl(queue[0].url);
       const dispatcher = serverQueue.connection.playOpusStream(stream).on("end", () => {
         const queue = admin.queue.get(gid);
         queue.shift();
