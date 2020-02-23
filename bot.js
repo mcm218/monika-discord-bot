@@ -202,7 +202,7 @@ bot.on("message", (message) => {
             message.channel.send(copypastas.brap);
             break;
           case 5:
-            message.channel.send(undefined, { files: "https://i.redd.it/kk51ksap2ye31.png" })
+            message.channel.send(undefined, { files: ["https://i.redd.it/kk51ksap2ye31.png"] })
         }
       } else if (message.content.match(/ankles/i)) {
         message.channel.send(copypastas.ankles);

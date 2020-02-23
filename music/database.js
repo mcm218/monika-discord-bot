@@ -1,6 +1,6 @@
 // Firebase App (the core Firebase SDK) is always required and
 // must be listed before other Firebase SDKs
-var firebase = require("firebase/app");
+const firebase = require("firebase/app");
 const auth = require("../auth.json");
 const admin = require("./admin.js")
 const ytdl = require('ytdl-core-discord');
@@ -17,6 +17,7 @@ function getQueue(gid, musicChannel) {
   const path = "guilds/" + gid + "/VC/queue/songs"
   db.collection(path).onSnapshot(async (docs) => {
     // Set up queue
+    const prev = Object.assign([], admin.queue.get(gid)); // previous queue
     const queue = [];
     docs.forEach((doc) => {
       queue.push(doc.data());
@@ -24,16 +25,19 @@ function getQueue(gid, musicChannel) {
     queue.sort((a, b) => a.pos - b.pos);
     admin.queue.set(gid, queue);
     // Set up voice channel
-    var connection;
+    let connection;
     if (admin.connection.has(gid)) {
       connection = admin.connection.get(gid);
     } else {
       connection = await musicChannel.join();
       admin.connection.set(gid, connection);
     }
-    // If no playing value found or playing is false
-    if (queue.length != 0 && (!admin.playing.has(gid) || !admin.playing.get(gid))) {
-      play(gid, queue);
+    if (queue.length !== 0 && (!admin.playing.has(gid) || !admin.playing.get(gid))) {
+      // If no playing value found or playing is false
+      await play(gid, queue);
+    }else if(queue.length !== 0 && queue[0].id && prev[0].id !== queue[0].id){
+      // song changed
+      connection.dispatcher.end("change");
     }
   });
 }
@@ -57,7 +61,7 @@ function updateQueue(gid, songs) {
 }
 
 async function play(gid, queue) {
-  if (queue.length == 0) {
+  if (queue.length === 0) {
     updateQueue(gid, []);
     return;
   }
@@ -71,7 +75,7 @@ async function play(gid, queue) {
   console.log("Starting stream, length: " + info.length_seconds);
   admin.time.set(gid, Date.now());
 
-  const dispatcher = connection.playOpusStream(stream).on("end", () => {
+  const dispatcher = connection.playOpusStream(stream).on("end", reason => {
     const queue = admin.queue.get(gid);
     console.log(queue[0].title + " has ended");
     const time = Date.now();
@@ -79,7 +83,9 @@ async function play(gid, queue) {
     console.log(durPlayed + "/" + admin.duration.get(gid));
     console.log((100 * durPlayed / admin.duration.get(gid)) + "%");
     admin.playing.set(gid, false);
-    queue.shift();
+    if(reason !== "change"){
+      queue.shift();
+    }
     play(gid, queue);
   }).on("error", error => {
     console.log(error);
@@ -123,7 +129,7 @@ async function getSearchList(playlist, search) {
 }
 
 async function getSearchSingle(playlist, search) {
-  var id;
+  let id;
   if (playlist) {
     await db
       .collection("searches/playlists/" + search)
