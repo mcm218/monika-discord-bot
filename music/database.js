@@ -34,7 +34,7 @@ function getQueue(gid, musicChannel) {
     }
     if (queue.length !== 0 && (!admin.playing.has(gid) || !admin.playing.get(gid))) {
       // If no playing value found or playing is false
-      await play(gid, queue);
+      play(gid, queue);
     }else if(queue.length !== 0 && queue[0].id && prev[0].id !== queue[0].id){
       // song changed
       connection.dispatcher.end("change");
@@ -67,7 +67,7 @@ async function play(gid, queue) {
   }
   admin.playing.set(gid, true);
   updateQueue(gid, queue);
-  console.log("Now playing: " + queue[0].title)
+  console.log("Now playing: " + queue[0].title);
   const info = await ytdl.getBasicInfo(queue[0].url);
   admin.duration.set(gid, info.length_seconds);
   const stream = await ytdl(queue[0].url);
@@ -80,10 +80,10 @@ async function play(gid, queue) {
     console.log(queue[0].title + " has ended");
     const time = Date.now();
     const durPlayed = Math.floor((time - admin.time.get(gid)) / 1000);
-    console.log(durPlayed + "/" + admin.duration.get(gid));
-    console.log((100 * durPlayed / admin.duration.get(gid)) + "%");
     admin.playing.set(gid, false);
     if(reason !== "change"){
+      console.log(durPlayed + "/" + admin.duration.get(gid));
+      console.log(Math.floor(100 * durPlayed / admin.duration.get(gid)) + "%");
       queue.shift();
     }
     play(gid, queue);
