@@ -78,63 +78,63 @@ bot.on("ready", () => {
 // Log bot in using token
 bot.login(auth.token);
 
-bot.on("message", (message) => {
+bot.on("message", async(message) => {
   if (message.author.bot) return; // Prevents bot from activating its self
   try {
     const serverQueue = admin.queue.get(message.guild.id);
 
     // If message starts with !
     if (
-      message.content.substring(0, 1) == config.prefix ||
+      message.content.substring(0, 1) === config.prefix ||
       message.content.substring(0, 1) === "!"
     ) {
       // Split message into parts, excluding prefix
-      var args = message.content.substring(1).split(" ");
-      var cmd = args[0].toLowerCase();
+      let args = message.content.substring(1).split(" ");
+      let cmd = args[0].toLowerCase();
 
       switch (cmd) {
         case "sayori":
-          message.channel.send("<:hangingsayori:665410228673839104>");
+          await message.channel.send("<:hangingsayori:665410228673839104>");
           break;
         case "commands":
-          message.channel.send("I'll break your nico-nico knees");
+          await message.channel.send("I'll break your nico-nico knees");
           // printCommands.printCommands(message);
           break;
         case "add":
-          message.channel.send("I'll break your nico-nico knees");
+          await message.channel.send("I'll break your nico-nico knees");
           // add.addSong(message, serverQueue);
           break;
         case "remove":
-          message.channel.send("I'll break your nico-nico knees");
+          await message.channel.send("I'll break your nico-nico knees");
           // queueController.remove(message, serverQueue);
           break;
         case "shift":
-          message.channel.send("I'll break your nico-nico knees");
+          await message.channel.send("I'll break your nico-nico knees");
           // queueController.shift(message, serverQueue);
           break;
         case "shuffle":
-          message.channel.send("I'll break your nico-nico knees");
+          await message.channel.send("I'll break your nico-nico knees");
           // queueController.shuffle(message, serverQueue);
           break;
         case "pause":
-          message.channel.send("I'll break your nico-nico knees");
+          await message.channel.send("I'll break your nico-nico knees");
           // playback.pause(message, serverQueue);
           break;
         case "search":
-          message.channel.send("I'll break your nico-nico knees");
+          await message.channel.send("I'll break your nico-nico knees");
           // search.searchSong(message);
           break;
         case "select":
-          message.channel.send("I'll break your nico-nico knees");
+          await message.channel.send("I'll break your nico-nico knees");
           // select.selectSong(message, serverQueue);
           break;
         case "play":
         case "resume":
-          message.channel.send("I'll break your nico-nico knees");
+          await message.channel.send("I'll break your nico-nico knees");
           // playback.resume(message, serverQueue);
           break;
         case "skip":
-          message.channel.send("I'll break your nico-nico knees");
+          await message.channel.send("I'll break your nico-nico knees");
           // playback.skip(
           //   admin.loop.get(message.guild.id),
           //   admin.serverVolumes.get(message.guild.id),
@@ -143,33 +143,33 @@ bot.on("message", (message) => {
           // );
           break;
         case "stop":
-          message.channel.send("I'll break your nico-nico knees");
+          await message.channel.send("I'll break your nico-nico knees");
           // playback.stop(admin.loop.get(message.guild.id), message, serverQueue);
           break;
         case "now":
         case "current":
         case "song":
-          message.channel.send("I'll break your nico-nico knees");
+          await message.channel.send("I'll break your nico-nico knees");
           // display.current(message, serverQueue);
           break;
         case "next":
         case "nextsong":
-          message.channel.send("I'll break your nico-nico knees");
+          await message.channel.send("I'll break your nico-nico knees");
           // display.next(message, serverQueue);
           break;
         case "list":
           // display.list(message, serverQueue);
           break;
         case "volume":
-          message.channel.send("I'll break your nico-nico knees");
+          await message.channel.send("I'll break your nico-nico knees");
           // playback.changeVolume(admin.serverVolumes, message, serverQueue);
           break;
         case "loop":
-          message.channel.send("I'll break your nico-nico knees");
+          await message.channel.send("I'll break your nico-nico knees");
           // playback.toggleLoop(message);
           break;
         default:
-          message.channel.send("Sorry, I don't know that command...");
+          await message.channel.send("Sorry, I don't know that command...");
           break;
       }
     } else {
@@ -177,47 +177,49 @@ bot.on("message", (message) => {
         message.content.match(/sayori/i) &&
         message.content.search("hanging") == -1
       ) {
-        message.channel.send("<:hangingsayori:665410228673839104>");
+        await message.channel.send("<:hangingsayori:665410228673839104>");
       } else if (
         (message.content.match(/best/i) && message.content.match(/girl/i)) ||
-        message.content.match(/bestgirl/i)
+          await message.content.match(/bestgirl/i)
       ) {
-        message.channel.send("<:JustMonika:664559827342852101>");
+        await message.channel.send("<:JustMonika:664559827342852101>");
       } else if (message.content.match(/dnd/i)) {
         const index = Math.floor(Math.random() * 6);
         switch (index) {
           case 0:
-            message.channel.send(copypastas.ankles);
+            await message.channel.send(copypastas.ankles);
             break;
           case 1:
-            message.channel.send(copypastas.dva);
+            await message.channel.send(copypastas.dva);
             break;
           case 2:
-            message.channel.send(copypastas.delete);
+            await message.channel.send(copypastas.delete);
             break;
           case 3:
-            message.channel.send(copypastas.milk);
+            await message.channel.send(copypastas.milk);
             break;
           case 4:
-            message.channel.send(copypastas.brap);
+            await message.channel.send(copypastas.brap);
             break;
           case 5:
-            message.channel.send(undefined, { files: ["https://i.redd.it/kk51ksap2ye31.png"] })
+            await message.channel.send(undefined, { files: ["https://i.redd.it/kk51ksap2ye31.png"] })
         }
       } else if (message.content.match(/ankles/i)) {
-        message.channel.send(copypastas.ankles);
+        await message.channel.send(copypastas.ankles);
       } else if (message.content.match(/dva/i)) {
-        message.channel.send(copypastas.dva);
+        await message.channel.send(copypastas.dva);
       } else if (message.content.match(/delete/i)) {
-        message.channel.send(copypastas.delete);
+        await message.channel.send(copypastas.delete);
       } else if (message.content.match(/milk/i)) {
-        message.channel.send(copypastas.milk);
+        await message.channel.send(copypastas.milk);
       } else if (message.content.match(/girl/i)) {
-        message.channel.send("<:alexiscoming:677231662173519873>");
+        await message.channel.send("<:alexiscoming:677231662173519873>");
       } else if (message.content.match(/smell/i)) {
-        message.channel.send(copypastas.brap, { files: ["https://i.redd.it/kk51ksap2ye31.png"] })
+        await message.channel.send(copypastas.brap, { files: ["https://i.redd.it/kk51ksap2ye31.png"] })
       } else if (message.content.match(/brap/i) || message.content.match(/fart/i)) {
-        message.channel.send(copypastas.brap, { files: ["https://i.redd.it/kk51ksap2ye31.png"] })
+        await message.channel.send(copypastas.brap, { files: ["https://i.redd.it/kk51ksap2ye31.png"] })
+      } else if (message.content.match(/mom/i)) {
+        await message.channel.send("", { files: ["./gifs/mom.gif"] })
       }
     }
   } catch (err) {
