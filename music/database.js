@@ -2,7 +2,7 @@
 // must be listed before other Firebase SDKs
 const firebase = require("firebase/app");
 const auth = require("../auth.json");
-const admin = require("./admin.js")
+const admin = require("./admin.js");
 const ytdl = require('ytdl-core-discord');
 // Add the Firebase products that you want to use
 require("firebase/firestore");
@@ -14,7 +14,7 @@ const app = firebase.initializeApp(firebaseConfig);
 let db = app.firestore();
 
 function getQueue(gid, musicChannel) {
-  const path = "guilds/" + gid + "/VC/queue/songs"
+  const path = "guilds/" + gid + "/VC/queue/songs";
   db.collection(path).onSnapshot(async (docs) => {
     // Set up queue
     const prev = Object.assign([], admin.queue.get(gid)); // previous queue
@@ -38,6 +38,7 @@ function getQueue(gid, musicChannel) {
     }else if(queue.length !== 0 && queue[0].id && prev[0].id !== queue[0].id){
       // song changed
       connection.dispatcher.end("change");
+      play(gid, queue);
     }
   });
 }
@@ -66,7 +67,7 @@ async function play(gid, queue) {
     return;
   }
   admin.playing.set(gid, true);
-  updateQueue(gid, queue);
+  // updateQueue(gid, queue);
   console.log("Now playing: " + queue[0].title);
   const info = await ytdl.getBasicInfo(queue[0].url);
   admin.duration.set(gid, info.length_seconds);
@@ -85,8 +86,8 @@ async function play(gid, queue) {
       console.log(durPlayed + "/" + admin.duration.get(gid));
       console.log(Math.floor(100 * durPlayed / admin.duration.get(gid)) + "%");
       queue.shift();
+      updateQueue(gid, queue);
     }
-    play(gid, queue);
   }).on("error", error => {
     console.log(error);
     play(gid, queue);
@@ -109,7 +110,7 @@ function pushSearch(playlist, search, results) {
   }
 }
 async function getSearchList(playlist, search) {
-  var docs;
+  let docs;
   if (playlist) {
     await db
       .collection("searches/playlists/" + search)
