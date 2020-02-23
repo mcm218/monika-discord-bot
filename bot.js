@@ -76,7 +76,7 @@ bot.on("ready", () => {
 });
 
 // Log bot in using token
-bot.login(auth.token);
+bot.login(auth.token).then();
 
 bot.on("message", async(message) => {
   if (message.author.bot) return; // Prevents bot from activating its self
