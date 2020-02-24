@@ -3,7 +3,7 @@
 const firebase = require("firebase/app");
 const auth = require("../auth.json");
 const admin = require("./admin.js");
-const ytdl = require('ytdl-core-discord');
+const ytdl = require("ytdl-core-discord");
 // Add the Firebase products that you want to use
 require("firebase/firestore");
 
@@ -32,12 +32,24 @@ function getQueue(gid, musicChannel) {
       connection = await musicChannel.join();
       admin.connection.set(gid, connection);
     }
-    if (queue.length !== 0 && (!admin.playing.has(gid) || !admin.playing.get(gid))) {
+    if (
+      queue.length !== 0 &&
+      (!admin.playing.has(gid) || !admin.playing.get(gid))
+    ) {
       // If no playing value found or playing is false
       play(gid, queue);
-    }else if(queue.length !== 0 && queue[0].id && prev[0].id !== queue[0].id){
+    } else if (
+      queue.length !== 0 &&
+      queue[0].id &&
+      prev[0].id !== queue[0].id
+    ) {
       // song changed
-      connection.dispatcher.end("change");
+      if (queue[1] && prev[0].id === queue[1].id) {
+        // user hit previous
+        connection.dispatcher.end("prev");
+      } else {
+        connection.dispatcher.end("skip");
+      }
       play(gid, queue);
     }
   });
@@ -76,25 +88,38 @@ async function play(gid, queue) {
   console.log("Starting stream, length: " + info.length_seconds);
   admin.time.set(gid, Date.now());
 
-  const dispatcher = connection.playOpusStream(stream).on("end", reason => {
-    const queue = admin.queue.get(gid);
-    console.log(queue[0].title + " has ended");
-    const time = Date.now();
-    const durPlayed = Math.floor((time - admin.time.get(gid)) / 1000);
-    admin.playing.set(gid, false);
-    if(reason !== "change"){
-      console.log(durPlayed + "/" + admin.duration.get(gid));
-      console.log(Math.floor(100 * durPlayed / admin.duration.get(gid)) + "%");
-      queue.shift();
-      updateQueue(gid, queue);
-    }
-  }).on("error", error => {
-    console.log(error);
-    play(gid, queue);
-  });
+  const dispatcher = connection
+    .playOpusStream(stream)
+    .on("end", (reason) => {
+      const queue = admin.queue.get(gid);
+      console.log(queue[0].title + " has ended");
+      const time = Date.now();
+      const durPlayed = Math.floor((time - admin.time.get(gid)) / 1000);
+      const loop = admin.loop.get(gid, false);
+      admin.playing.set(gid, false);
+      if (loop == 1 && reason !== "prev") {
+        // looping the entire queue
+        queue.push(queue[0]);
+      }
+      if (reason !== "skip" && reason !== "prev") {
+        console.log(durPlayed + "/" + admin.duration.get(gid));
+        console.log(
+          Math.floor((100 * durPlayed) / admin.duration.get(gid)) + "%"
+        );
+
+        if (loop != 2) {
+          // looping the current song
+          queue.shift();
+        }
+        updateQueue(gid, queue);
+      }
+    })
+    .on("error", (error) => {
+      console.log(error);
+      play(gid, queue);
+    });
   dispatcher.setVolumeLogarithmic(1);
 }
-
 
 function pushSearch(playlist, search, results) {
   var path;
