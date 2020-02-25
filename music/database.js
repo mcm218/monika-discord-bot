@@ -66,7 +66,7 @@ function updateQueue(gid, songs) {
   songs.forEach((song) => {
     song.pos = i;
     db.collection(path)
-      .doc(i.toString())
+      .doc(song.uid)
       .set(song);
     i++;
   });
