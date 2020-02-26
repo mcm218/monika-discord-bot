@@ -15,6 +15,7 @@ let db = app.firestore();
 
 function getQueue(gid, musicChannel) {
   const path = "guilds/" + gid + "/VC/queue/songs";
+  const controllerPath = "guilds/" + gid + "/VC";
   db.collection(path).onSnapshot(async (docs) => {
     // Set up queue
     const prev = Object.assign([], admin.queue.get(gid)); // previous queue
@@ -59,9 +60,6 @@ function updateQueue(gid, songs) {
   const path = "guilds/" + gid + "/VC/queue/songs";
   const pos = songs.length;
   let batch = db.batch();
-  db.collection(path)
-    .doc(pos.toString())
-    .delete();
   let i = 0;
   songs.forEach((song) => {
     song.pos = i;
@@ -97,11 +95,16 @@ async function play(gid, queue) {
       const durPlayed = Math.floor((time - admin.time.get(gid)) / 1000);
       const loop = admin.loop.get(gid, false);
       admin.playing.set(gid, false);
+      const path = "guilds/" + gid + "/VC/queue/songs";
       if (loop == 1 && reason !== "prev") {
         // looping the entire queue
+        queue[0].pos = queue.length - 1;
         queue.push(queue[0]);
       }
       if (reason !== "skip" && reason !== "prev") {
+        db.collection(path)
+          .doc(queue[0].uid)
+          .delete();
         console.log(durPlayed + "/" + admin.duration.get(gid));
         console.log(
           Math.floor((100 * durPlayed) / admin.duration.get(gid)) + "%"
@@ -118,7 +121,7 @@ async function play(gid, queue) {
       console.log(error);
       play(gid, queue);
     });
-  dispatcher.setVolumeLogarithmic(1);
+  dispatcher.setVolumeLogarithmic(0.1);
 }
 
 function pushSearch(playlist, search, results) {
