@@ -126,7 +126,7 @@ async function play(gid, queue) {
   console.log("Now playing: " + song.title);
   const info = await ytdl.getBasicInfo(song.url);
   admin.duration.set(gid, info.length_seconds);
-  const stream = await ytdl(song.url, { highWaterMark: 1 << 25 });
+  const stream = await ytdl(song.url, { quality: "140", highWaterMark: 1 << 25 });
   const connection = admin.connection.get(gid);
   console.log("Starting stream, length: " + info.length_seconds);
   admin.time.set(gid, Date.now());
