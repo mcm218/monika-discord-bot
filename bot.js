@@ -1,11 +1,4 @@
-const playback = require("./music/playback");
-const display = require("./music/display");
-const queueController = require("./music/queue_control");
 const admin = require("./music/admin");
-const search = require("./music/search");
-const select = require("./music/select");
-const add = require("./music/add");
-const play = require("./music/play");
 const db = require("./music/database");
 const printCommands = require("./printCommands");
 const copypastas = require("./copypastas");
@@ -30,7 +23,7 @@ logger.level = "debug";
 var bot = new Discord.Client();
 // Update DB whenever user joins/leaves VC
 bot.on("voiceStateUpdate", (oldMember, newMember) => {
-  if (newMember.user.bot) return;
+  // if (newMember.user.bot) return;
   if (
     newMember.voiceChannel &&
     newMember.voiceChannel != oldMember.voiceChannel
@@ -52,9 +45,6 @@ bot.on("voiceStateUpdate", (oldMember, newMember) => {
 bot.on("ready", () => {
   admin.youtubeKey.push(auth.youtubeKey);
   bot.guilds.forEach((guild) => {
-    const queueRef = db.getQueueRef(guild.id);
-    const controllerRef = db.getControllerRef(guild.id);
-    var queueObserver = admin.queueObservers.get(guild.id);
     admin.loop.set(guild.id, 0);
     admin.shuffleMode.set(guild.id, false);
     admin.pauseState.set(guild.id, false);
