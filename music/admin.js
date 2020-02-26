@@ -1,5 +1,6 @@
 const queueObservers = new Map();
 const queue = new Map();
+const history = new Map();
 const connection = new Map();
 const playing = new Map();
 const time = new Map();
@@ -28,5 +29,6 @@ module.exports = {
   connection,
   playing,
   time,
-  duration
+  duration,
+  history
 };

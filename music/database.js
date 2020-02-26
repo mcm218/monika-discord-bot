@@ -14,10 +14,10 @@ const app = firebase.initializeApp(firebaseConfig);
 let db = app.firestore();
 
 function getQueue(gid, musicChannel) {
-  const path = "guilds/" + gid + "/VC/queue/songs";
-  const controllerPath = "guilds/" + gid + "/VC";
+  const queuePath = "guilds/" + gid + "/VC/queue/songs";
+  const path = "guilds/" + gid + "/VC";
 
-  db.collection(path).onSnapshot(async docs => {
+  db.collection(queuePath).onSnapshot(async docs => {
     // Set up queue
     const prev = Object.assign([], admin.queue.get(gid)); // previous queue
     const queue = [];
@@ -68,7 +68,7 @@ function getQueue(gid, musicChannel) {
     }
   });
 
-  db.collection(controllerPath)
+  db.collection(path)
     .doc("controller")
     .onSnapshot(doc => {
       const controller = doc.data();
@@ -83,6 +83,17 @@ function getQueue(gid, musicChannel) {
           connection.dispatcher.resume();
         }
         setVolume(connection.dispatcher, gid);
+      }
+    });
+
+  db.collection(path)
+    .doc("history")
+    .onSnapshot(doc => {
+      if (doc.exists) {
+        const history = doc.data().history;
+        admin.history.set(gid, history);
+      } else {
+        admin.history.set(gid, []);
       }
     });
 }
@@ -115,7 +126,7 @@ async function play(gid, queue) {
   console.log("Now playing: " + song.title);
   const info = await ytdl.getBasicInfo(song.url);
   admin.duration.set(gid, info.length_seconds);
-  const stream = await ytdl(song.url, {highWaterMark: 1<<25});
+  const stream = await ytdl(song.url, { highWaterMark: 1 << 25 });
   const connection = admin.connection.get(gid);
   console.log("Starting stream, length: " + info.length_seconds);
   admin.time.set(gid, Date.now());
@@ -147,9 +158,12 @@ async function play(gid, queue) {
           );
 
           if (loop != 2) {
-            // looping the current song
+            // not looping the current song
             queue.shift();
           }
+          const history = admin.history.get(gid);
+          history.unshift(song);
+          updateHistory(gid, history);
           updateQueue(gid, queue);
         }
       })
@@ -165,55 +179,14 @@ async function play(gid, queue) {
   }
 }
 
-async function playSeek(gid, queue, seekTime) {
-  const song = queue[0];
-  // updateQueue(gid, queue);
-  admin.duration.set(gid, info.length_seconds);
-  const stream = await ytdl(song.url);
-  const connection = admin.connection.get(gid);
-  const streamOptions = { seek: seekTime };
-  admin.time.set(gid, Date.now());
-  try {
-    const dispatcher = connection
-      .playStream(stream, streamOptions)
-      .on("end", reason => {
-        console.log(reason);
-        const queue = admin.queue.get(gid);
-        console.log(song.title + " has ended");
-        const loop = admin.loop.get(gid, false);
-        admin.playing.set(gid, false);
-        const path = "guilds/" + gid + "/VC/queue/songs";
-        if (loop == 1 && reason !== "prev") {
-          // looping the entire queue
-          song.pos = queue.length - 1;
-          queue.push(song);
-        }
-        if (reason !== "skip" && reason !== "prev") {
-          db.collection(path)
-            .doc(song.uid)
-            .delete();
-          console.log(durPlayed + "/" + admin.duration.get(gid));
-          console.log(
-            Math.floor((100 * durPlayed) / admin.duration.get(gid)) + "%"
-          );
-
-          if (loop != 2) {
-            // looping the current song
-            queue.shift();
-          }
-          updateQueue(gid, queue);
-        }
-      })
-      .on("error", error => {
-        console.log(error);
-        queue.shift();
-        admin.playing.set(gid, false);
-        updateQueue(gid, queue);
-      });
-    setVolume(dispatcher, gid);
-  } catch (err) {
-    console.error(err);
+function updateHistory(gid, songs) {
+  const path = "guilds/" + gid + "/VC/";
+  while (songs.length > 20) {
+    songs.pop();
   }
+  db.collection(path)
+    .doc("history")
+    .set({ history: songs });
 }
 
 function pushUser(gid, user) {
