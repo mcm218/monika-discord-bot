@@ -23,7 +23,7 @@ logger.level = "debug";
 var bot = new Discord.Client();
 // Update DB whenever user joins/leaves VC
 bot.on("voiceStateUpdate", (oldMember, newMember) => {
-  // if (newMember.user.bot) return;
+  if (newMember.user.bot) return;
   if (
     newMember.voiceChannel &&
     newMember.voiceChannel != oldMember.voiceChannel

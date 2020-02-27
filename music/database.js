@@ -4,6 +4,7 @@ const firebase = require("firebase/app");
 const auth = require("../auth.json");
 const admin = require("./admin.js");
 const ytdl = require("ytdl-core");
+const fs = require("fs");
 // Add the Firebase products that you want to use
 require("firebase/firestore");
 
@@ -72,16 +73,30 @@ function getQueue(gid, musicChannel) {
     .doc("controller")
     .onSnapshot(doc => {
       const controller = doc.data();
-      admin.pauseState.set(gid, controller.pauseState);
       admin.loop.set(gid, controller.loop);
       admin.serverVolumes.set(gid, controller.volume);
       const connection = admin.connection.get(gid);
       if (connection && connection.dispatcher) {
         if (controller.pauseState) {
+          console.log("Pause");
+          if (
+            admin.pauseState.has(gid) &&
+            admin.pauseState.get(gid) != controller.pauseState
+          ) {
+            updatePauseTime(gid, Date.now());
+          }
           connection.dispatcher.pause();
         } else {
+          console.log("Play");
+          if (
+            admin.pauseState.has(gid) &&
+            admin.pauseState.get(gid) != controller.pauseState
+          ) {
+            updateResumeTime(gid, Date.now());
+          }
           connection.dispatcher.resume();
         }
+        admin.pauseState.set(gid, controller.pauseState);
         setVolume(connection.dispatcher, gid);
       }
     });
@@ -99,7 +114,7 @@ function getQueue(gid, musicChannel) {
 }
 function setVolume(dispatcher, gid) {
   const vol = admin.serverVolumes.get(gid);
-  dispatcher.setVolumeLogarithmic(vol / 30);
+  dispatcher.setVolumeLogarithmic(vol / 60);
 }
 function updateQueue(gid, songs) {
   const path = "guilds/" + gid + "/VC/queue/songs";
@@ -115,6 +130,27 @@ function updateQueue(gid, songs) {
   batch.commit();
 }
 
+function updateTime(gid, start, duration) {
+  const path = "guilds/" + gid + "/VC";
+  db.collection(path)
+    .doc("controller")
+    .set(
+      { startTime: start, duration: duration, pauseTime: -1, resumeTime: -1 },
+      { merge: true }
+    );
+}
+function updatePauseTime(gid, pause) {
+  const path = "guilds/" + gid + "/VC";
+  db.collection(path)
+    .doc("controller")
+    .set({ pauseTime: pause, resumeTime: -1 }, { merge: true });
+}
+function updateResumeTime(gid, resume) {
+  const path = "guilds/" + gid + "/VC";
+  db.collection(path)
+    .doc("controller")
+    .set({ resumeTime: resume }, { merge: true });
+}
 async function play(gid, queue) {
   if (queue.length === 0) {
     admin.playing.set(gid, false);
@@ -124,58 +160,94 @@ async function play(gid, queue) {
   const song = queue[0];
   // updateQueue(gid, queue);
   console.log("Now playing: " + song.title);
-  const info = await ytdl.getBasicInfo(song.url);
-  admin.duration.set(gid, info.length_seconds);
-  const stream = await ytdl(song.url, { quality: "140", highWaterMark: 1 << 25 });
-  const connection = admin.connection.get(gid);
-  console.log("Starting stream, length: " + info.length_seconds);
-  admin.time.set(gid, Date.now());
   try {
-    const dispatcher = connection
-      .playStream(stream)
-      .on("end", reason => {
-        const time = Date.now();
-        const durPlayed = Math.floor((time - admin.time.get(gid)) / 1000);
+    const info = await ytdl.getBasicInfo(song.url);
+    admin.duration.set(gid, info.length_seconds);
+    const stream = await ytdl(song.url, {
+      quality: "18"
+      // highWaterMark: 1 << 25
+    }).on("response", response => console.log("Response received"));
+    const dlStart = Date.now();
+    stream.pipe(fs.createWriteStream("music/song_" + gid));
+    stream.on("end", () => {
+      const dlEnd = Date.now();
+      const dlDuration = Math.floor((dlEnd - dlStart) / 1000);
+      console.log("Download Time: " + dlDuration);
+      const connection = admin.connection.get(gid);
+      var dlTimeStr =
+        "Starting stream, length - " +
+        Math.floor(info.length_seconds / 60) +
+        ":";
+      if (info.length_seconds % 60 < 10) {
+        let sec = "0" + (info.length_seconds % 60);
+        dlTimeStr += sec;
+      } else {
+        dlTimeStr += info.length_seconds % 60;
+      }
+      console.log(dlTimeStr);
 
-        if (reason) console.log(reason);
-        const queue = admin.queue.get(gid);
-        console.log(song.title + " has ended");
-        const loop = admin.loop.get(gid, false);
-        admin.playing.set(gid, false);
-        const path = "guilds/" + gid + "/VC/queue/songs";
-        if (loop == 1 && reason !== "prev") {
-          // looping the entire queue
-          song.pos = queue.length - 1;
-          queue.push(song);
-        }
-        if (reason !== "skip" && reason !== "prev") {
-          db.collection(path)
-            .doc(song.uid)
-            .delete();
-          console.log(durPlayed + "/" + admin.duration.get(gid));
-          console.log(
-            Math.floor((100 * durPlayed) / admin.duration.get(gid)) + "%"
-          );
+      const dispatcher = connection
+        .playFile(__dirname + "/song_" + gid)
+        .on("start", () => {
+          console.log("Starting song...");
+          const now = Date.now();
+          admin.time.set(gid, now);
+          updateTime(gid, now, info.length_seconds);
+        })
+        .on("end", reason => {
+          const time = Date.now();
+          const durPlayed = Math.ceil((time - admin.time.get(gid)) / 1000);
 
-          if (loop != 2) {
-            // not looping the current song
-            queue.shift();
+          if (reason) console.log(reason);
+          const queue = admin.queue.get(gid);
+          console.log(song.title + " has ended");
+          const loop = admin.loop.get(gid);
+          admin.playing.set(gid, false);
+          const path = "guilds/" + gid + "/VC/queue/songs";
+          if (loop == 1 && reason !== "prev") {
+            // looping the entire queue
+            song.pos = queue.length - 1;
+            queue.push(song);
           }
-          const history = admin.history.get(gid);
-          history.unshift(song);
-          updateHistory(gid, history);
+          if (reason !== "skip" && reason !== "prev") {
+            db.collection(path)
+              .doc(song.uid)
+              .delete();
+            console.log(durPlayed + "/" + admin.duration.get(gid));
+            console.log(
+              Math.floor((100 * durPlayed) / admin.duration.get(gid)) + "%"
+            );
+
+            if (loop != 2) {
+              // not looping the current song
+              queue.shift();
+              const history = admin.history.get(gid);
+              history.unshift(song);
+              updateHistory(gid, history);
+            } else {
+              console.log("Looping song...");
+              console.log(queue[0].title);
+            }
+            updateQueue(gid, queue);
+          }
+        })
+        .on("error", error => {
+          console.error(error);
+          queue.shift();
+          admin.playing.set(gid, false);
           updateQueue(gid, queue);
-        }
-      })
-      .on("error", error => {
-        console.log(error);
-        queue.shift();
-        admin.playing.set(gid, false);
-        updateQueue(gid, queue);
-      });
-    setVolume(dispatcher, gid);
+        });
+      if (admin.pauseState.get(gid)) {
+        console.log("Pause");
+        dispatcher.pause();
+      }
+      setVolume(dispatcher, gid);
+    });
   } catch (err) {
     console.error(err);
+    queue.shift();
+    admin.playing.set(gid, false);
+    updateQueue(gid, queue);
   }
 }
 
