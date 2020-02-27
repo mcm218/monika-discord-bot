@@ -2,3 +2,4 @@ node_modules/
 auth.json
 client_secret.json
 backup.json
+/music/song*
