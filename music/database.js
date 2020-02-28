@@ -193,6 +193,7 @@ async function play(gid, queue) {
           const now = Date.now();
           admin.time.set(gid, now);
           updateTime(gid, now, info.length_seconds);
+          setVolume(dispatcher, gid);
         })
         .on("end", reason => {
           const time = Date.now();
@@ -241,7 +242,6 @@ async function play(gid, queue) {
         console.log("Pause");
         dispatcher.pause();
       }
-      setVolume(dispatcher, gid);
     });
   } catch (err) {
     console.error(err);
