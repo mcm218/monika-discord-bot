@@ -131,9 +131,14 @@ function updateQueue(gid, songs) {
   let i = 0;
   songs.forEach(song => {
     song.pos = i;
-    db.collection(path)
-      .doc(song.uid)
-      .set(song);
+    song.dateUpdated = Date.now();
+    try {
+      db.collection(path)
+        .doc(song.uid)
+        .set(song);
+    } catch (error) {
+      console.error(error);
+    }
     i++;
   });
   batch.commit();
@@ -234,9 +239,11 @@ async function play(gid, queue) {
             queue.push(song);
           }
           if (reason !== "skip" && reason !== "prev") {
-            db.collection(path)
-              .doc(song.uid)
-              .delete();
+            if (loop == 0) {
+              db.collection(path)
+                .doc(song.uid)
+                .delete();
+            }
             console.log(durPlayed + "/" + admin.duration.get(gid));
             console.log(
               Math.floor((100 * durPlayed) / admin.duration.get(gid)) + "%"
@@ -252,7 +259,6 @@ async function play(gid, queue) {
               console.log("Looping song...");
               console.log(queue[0].title);
             }
-
             updateQueue(gid, queue);
           }
         })
