@@ -189,7 +189,7 @@ async function play(gid, queue) {
       // highWaterMark: 1 << 25
     }).on("response", response => console.log("Response received"));
     const dlStart = Date.now();
-    stream.pipe(fs.createWriteStream("music/song_" + gid));
+    stream.pipe(fs.createWriteStream("music/song_" + song.id));
     // Once download finishes, set up Discord stream
     stream.on("end", () => {
       const dlEnd = Date.now();
@@ -215,7 +215,7 @@ async function play(gid, queue) {
         return;
       }
       const dispatcher = connection
-        .playFile(__dirname + "/song_" + gid)
+        .playFile(__dirname + "/song_" + song.id)
         .on("start", () => {
           console.log("Starting song...");
           const now = Date.now();
@@ -224,6 +224,9 @@ async function play(gid, queue) {
           setVolume(dispatcher, gid);
         })
         .on("end", reason => {
+          fs.unlink("music/song_" + song.id, () => {
+            console.log("Deleted old song file...");
+          });
           const time = Date.now();
           const durPlayed = Math.ceil((time - admin.time.get(gid)) / 1000);
 
