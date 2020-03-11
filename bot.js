@@ -5,14 +5,9 @@ const copypastas = require("./copypastas");
 const Discord = require("discord.js");
 const logger = require("winston");
 const auth = require("./auth.json");
+const key = require("./client_secret.json");
 const config = require("./config.json");
-// Firebase App (the core Firebase SDK) is always required and
-// must be listed before other Firebase SDKs
-var firebase = require("firebase/app");
-// Add the Firebase products that you want to use
-require("firebase/firestore");
 
-// Configure logger settings
 logger.remove(logger.transports.Console);
 logger.add(new logger.transports.Console(), {
   colorize: true
@@ -42,7 +37,10 @@ bot.on("voiceStateUpdate", (oldMember, newMember) => {
 });
 
 // When bot is ready, print to console
-bot.on("ready", () => {
+bot.on("ready", async () => {
+  await db.authBot(bot.user.id);
+
+  console.log("Getting guild data...");
   admin.youtubeKey.push(auth.youtubeKey);
   bot.guilds.forEach((guild) => {
     admin.loop.set(guild.id, 0);
@@ -68,7 +66,7 @@ bot.on("ready", () => {
 // Log bot in using token
 bot.login(auth.token).then();
 
-bot.on("message", async(message) => {
+bot.on("message", async (message) => {
   if (message.author.bot) return; // Prevents bot from activating its self
   try {
     const serverQueue = admin.queue.get(message.guild.id);
@@ -170,7 +168,7 @@ bot.on("message", async(message) => {
         await message.channel.send("<:hangingsayori:665410228673839104>");
       } else if (
         (message.content.match(/best/i) && message.content.match(/girl/i)) ||
-          await message.content.match(/bestgirl/i)
+        await message.content.match(/bestgirl/i)
       ) {
         await message.channel.send("<:JustMonika:664559827342852101>");
       } else if (message.content.match(/dnd/i)) {

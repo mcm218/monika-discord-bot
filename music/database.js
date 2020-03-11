@@ -1,18 +1,28 @@
 // Firebase App (the core Firebase SDK) is always required and
 // must be listed before other Firebase SDKs
-const firebase = require("firebase/app");
-const auth = require("../auth.json");
 const admin = require("./admin.js");
 const ytdl = require("ytdl-core");
 const fs = require("fs");
-// Add the Firebase products that you want to use
+const auth = require("../auth.json");
+const firebase = require("firebase/app");
+const firebaseConfig = auth.firebaseConfig;
+firebase.initializeApp(firebaseConfig);
+require("firebase/auth");
+require("firebase/functions");
 require("firebase/firestore");
 
-// Initialize Firebase
-const firebaseConfig = auth.firebaseConfig;
-const app = firebase.initializeApp(firebaseConfig);
+const fbAuth = firebase.auth();
+const fbFunctions = firebase.functions();
+const db = firebase.firestore();
 
-let db = app.firestore();
+async function authBot(id) {
+  console.log("Creating custom token...");
+  let res = await fbFunctions.httpsCallable("getUserToken")({ userId: id, bot: true });
+  console.log("Signing user in...");
+  await fbAuth.signInWithCustomToken(res.data.customToken);
+  return;
+}
+
 // Called when the Bot first starts, sets up listeners for the database
 function getQueue(gid, musicChannel) {
   const queuePath = "guilds/" + gid + "/VC/queue/songs";
@@ -323,5 +333,6 @@ module.exports = {
   pushUser: pushUser,
   pushController: pushController,
   popUser: popUser,
-  getQueue: getQueue
+  getQueue: getQueue,
+  authBot: authBot
 };
