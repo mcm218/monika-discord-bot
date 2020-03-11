@@ -5,7 +5,6 @@ const copypastas = require("./copypastas");
 const Discord = require("discord.js");
 const logger = require("winston");
 const auth = require("./auth.json");
-const key = require("./client_secret.json");
 const config = require("./config.json");
 
 logger.remove(logger.transports.Console);
