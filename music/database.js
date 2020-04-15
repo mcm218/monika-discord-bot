@@ -44,7 +44,13 @@ function getQueue(gid, musicChannel) {
         connection = admin.connection.get(gid);
       } else if (queue && queue.length > 0) {
         console.log("Joining VC");
-        connection = await musicChannel.join();
+        try{
+          connection = await musicChannel.join();
+        }catch(e){
+          console.log("Error joining VC");
+          console.log(e);
+          return;
+        }
         admin.connection.set(gid, connection);
       } else {
         return;
@@ -132,7 +138,7 @@ function getQueue(gid, musicChannel) {
 // Sets the Volume of the Dispatcher
 function setVolume(dispatcher, gid) {
   const vol = admin.serverVolumes.get(gid);
-  dispatcher.setVolumeLogarithmic(vol / 60);
+  dispatcher.setVolumeLogarithmic(0);
 }
 // Updates queue in Database
 function updateQueue(gid, songs) {

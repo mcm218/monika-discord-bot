@@ -159,7 +159,7 @@ bot.on("message", async (message) => {
           await message.channel.send("Sorry, I don't know that command...");
           break;
       }
-    } else {
+    } /* else {
       if (
         message.content.match(/sayori/i) &&
         message.content.search("hanging") == -1
@@ -208,7 +208,7 @@ bot.on("message", async (message) => {
       } else if (message.content.match(/mom/i)) {
         await message.channel.send("", { files: ["./gifs/mom.gif"] })
       }
-    }
+    } */
   } catch (err) {
     console.error(err);
   }
