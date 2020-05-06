@@ -1,11 +1,12 @@
 const admin = require("./music/admin");
 const db = require("./music/database");
-const printCommands = require("./printCommands");
+const display = require("./display");
 const copypastas = require("./copypastas");
 const Discord = require("discord.js");
 const logger = require("winston");
 const auth = require("./auth.json");
 const config = require("./config.json");
+const validURL = require("./validUrl");
 
 logger.remove(logger.transports.Console);
 logger.add(new logger.transports.Console(), {
@@ -84,24 +85,29 @@ bot.on("message", async (message) => {
           await message.channel.send("<:hangingsayori:665410228673839104>");
           break;
         case "commands":
-          await message.channel.send("I'll break your nico-nico knees");
-          // printCommands.printCommands(message);
+        case "help":
+          // await message.channel.send("I'll break your nico-nico knees");
+          display.printCommands(message);
           break;
         case "add":
-          await message.channel.send("I'll break your nico-nico knees");
-          // add.addSong(message, serverQueue);
+          // await message.channel.send("I'll break your nico-nico knees");
+          if(validURL.validURL(args.slice(1).join(" "))){
+            await db.addSongFromUrl(message.guild.id, args.slice(1).join(" "), message);
+          }else{
+            await db.addSong(message.guild.id, args.slice(1).join(" "), message);
+          }
           break;
         case "remove":
-          await message.channel.send("I'll break your nico-nico knees");
-          // queueController.remove(message, serverQueue);
+          // await message.channel.send("I'll break your nico-nico knees");
+          db.removeSong(message.guild.id, args[1], message);
           break;
         case "shift":
-          await message.channel.send("I'll break your nico-nico knees");
-          // queueController.shift(message, serverQueue);
+          // await message.channel.send("I'll break your nico-nico knees");
+          db.shiftSong(message.guild.id, args[1], message);
           break;
         case "shuffle":
-          await message.channel.send("I'll break your nico-nico knees");
-          // queueController.shuffle(message, serverQueue);
+          // await message.channel.send("I'll break your nico-nico knees");
+          db.shuffleQueue(message.guild.id, message);
           break;
         case "pause":
           await message.channel.send("I'll break your nico-nico knees");
@@ -121,13 +127,8 @@ bot.on("message", async (message) => {
           // playback.resume(message, serverQueue);
           break;
         case "skip":
-          await message.channel.send("I'll break your nico-nico knees");
-          // playback.skip(
-          //   admin.loop.get(message.guild.id),
-          //   admin.serverVolumes.get(message.guild.id),
-          //   message,
-          //   serverQueue
-          // );
+          // await message.channel.send("I'll break your nico-nico knees");
+          db.removeSong(message.guild.id, 1 ,message);
           break;
         case "stop":
           await message.channel.send("I'll break your nico-nico knees");
@@ -145,7 +146,9 @@ bot.on("message", async (message) => {
           // display.next(message, serverQueue);
           break;
         case "list":
-          // display.list(message, serverQueue);
+        case "queue":
+        case "songs":
+          display.printQueue(message.guild.id, message);
           break;
         case "volume":
           await message.channel.send("I'll break your nico-nico knees");

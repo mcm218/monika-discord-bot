@@ -1,6 +1,7 @@
 // Firebase App (the core Firebase SDK) is always required and
 // must be listed before other Firebase SDKs
 const admin = require("./admin.js");
+
 const ytdl = require("ytdl-core");
 const fs = require("fs");
 const auth = require("../auth.json");
@@ -10,10 +11,15 @@ firebase.initializeApp(firebaseConfig);
 require("firebase/auth");
 require("firebase/functions");
 require("firebase/firestore");
+const validURL = require("../validUrl");
 
 const fbAuth = firebase.auth();
 const fbFunctions = firebase.functions();
 const db = firebase.firestore();
+
+const YouTube = require("discord-youtube-api");
+const youtube = new YouTube(auth.youtubeKey);
+
 
 async function authBot(id) {
   console.log("Creating custom token...");
@@ -138,7 +144,7 @@ function getQueue(gid, musicChannel) {
 // Sets the Volume of the Dispatcher
 function setVolume(dispatcher, gid) {
   const vol = admin.serverVolumes.get(gid);
-  dispatcher.setVolumeLogarithmic(0);
+  dispatcher.setVolumeLogarithmic(vol / 20);
 }
 // Updates queue in Database
 function updateQueue(gid, songs) {
@@ -158,6 +164,105 @@ function updateQueue(gid, songs) {
     i++;
   });
   batch.commit();
+}
+
+async function removeSong(gid, index, message){
+  let queue = admin.queue.get(gid);
+  if(!queue || queue.length == 0){
+    message.channel.send("No songs in the queue...");
+    return;
+  }
+  if(index == 1){
+    let connection = admin.connection.get(gid);
+    connection.dispatcher.end("");
+  }else{
+    const path = "guilds/" + gid + "/VC/queue/songs";
+    const song = queue.splice(index - 1, 1)[0];
+    db.collection(path).doc(song.uid).delete();
+    message.channel.send("Removed " + song.title);
+  }
+}
+
+async function addSong(gid, search, message){
+  // Search for song
+  const video = await youtube.searchVideos(search)
+  message.channel.send("Added " + video.title);
+  // Add first result to Queue
+  let queue = admin.queue.get(gid);
+  const song = {
+    "date": new Date().toString(),
+    "id": video.id,
+    "uid": Date.now().toString(),
+    "source": "youtube",
+    "thumbnail": video.thumbnail,
+    "title": video.title,
+    "url": video.url,
+    "user": {
+      "username": message.author.username,
+      "id": message.author.id,
+      "avatar": message.author.avatar
+    },
+    "youtubeTitle": video.title
+  };
+  queue.push(song);
+  // Update queue
+  updateQueue(gid, queue);
+}
+
+async function addSongFromUrl(gid, url, message){
+  // Search for song
+  const video = await youtube.getVideo(url)
+  message.channel.send("Added " + video.title);
+  // Add first result to Queue
+  let queue = admin.queue.get(gid);
+  const song = {
+    "date": new Date().toString(),
+    "id": video.id,
+    "uid": Date.now().toString(),
+    "source": "youtube",
+    "thumbnail": video.thumbnail,
+    "title": video.title,
+    "url": video.url,
+    "user": {
+      "username": message.author.username,
+      "id": message.author.id,
+      "avatar": message.author.avatar
+    },
+    "youtubeTitle": video.title
+  };
+  queue.push(song);
+  // Update queue
+  updateQueue(gid, queue);
+}
+
+async function shiftSong(gid, index, message){
+  let queue = admin.queue.get(gid);
+  if(!queue || queue.length == 0){
+    message.channel.send("No songs in the queue...");
+    return;
+  }
+  if(index < 1){
+    message.channel.send("Invalid index :<")
+  }
+  if(index == 1 || index == 2){
+    return;
+  }
+  const path = "guilds/" + gid + "/VC/queue/songs";
+  const song = queue.splice(index - 1, 1)[0];
+  queue.splice(1, 0, song);
+  updateQueue(gid, queue);
+}
+
+async function shuffleQueue(gid, message){
+  let queue = admin.queue.get(gid);
+  for(let i = queue.length - 1; i > 1; i--){
+    const j = Math.floor(Math.random() * (i - 1)) + 1;
+    const temp = queue.splice(i, 1)[0];
+    queue[i] = queue[j];
+    queue[j] = temp;
+  }
+  updateQueue(gid, queue);
+
 }
 // Updates database controller with the start time of the song
 function updateTime(gid, start, duration) {
@@ -196,6 +301,14 @@ async function play(gid, queue) {
     return;
   }
   const song = queue[0];
+  if(song == null || song.url == null){
+    console.error("Tried to play undefined song object...");
+    return;
+  }
+  if(!validURL.validURL(song.url)){
+    console.error("Tried to play invalid song object...");
+    return;
+  }
   console.log("Now playing: " + song.title);
   try {
     const info = await ytdl.getBasicInfo(song.url);
@@ -240,6 +353,7 @@ async function play(gid, queue) {
           setVolume(dispatcher, gid);
         })
         .on("end", reason => {
+          updateTime(gid, -1, -1);
           fs.unlink("music/song_" + song.id, () => {
             console.log("Deleted old song file...");
           });
@@ -247,10 +361,9 @@ async function play(gid, queue) {
           const durPlayed = Math.ceil((time - admin.time.get(gid)) / 1000);
 
           if (reason) console.log(reason);
-          const queue = admin.queue.get(gid);
+          const queue = Object.assign([], admin.queue.get(gid));
           console.log(song.title + " has ended");
           const loop = admin.loop.get(gid);
-          admin.playing.set(gid, false);
           const path = "guilds/" + gid + "/VC/queue/songs";
           if (loop == 1 && reason !== "prev") {
             // looping the entire queue
@@ -279,9 +392,11 @@ async function play(gid, queue) {
               console.log(queue[0].title);
             }
             updateQueue(gid, queue);
+            admin.playing.set(gid, false);
           }
         })
         .on("error", error => {
+          console.log("ERROR PLAYING FILE: \n");
           console.error(error);
           queue.shift();
           admin.playing.set(gid, false);
@@ -340,5 +455,10 @@ module.exports = {
   pushController: pushController,
   popUser: popUser,
   getQueue: getQueue,
-  authBot: authBot
+  authBot: authBot,
+  addSong: addSong,
+  addSongFromUrl: addSongFromUrl,
+  removeSong: removeSong,
+  shiftSong: shiftSong,
+  shuffleQueue: shuffleQueue
 };
