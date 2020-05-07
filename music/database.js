@@ -303,7 +303,7 @@ async function play(gid, queue) {
   const song = queue[0];
   console.log(song);
   console.log(song.url);
-  if(!song || song == null || !song.url || song.url == null){
+  if(!song || song == undefined || !song.url || song.url == undefined){
     console.error("Tried to play undefined song object...");
     queue.shift();
     admin.playing.set(gid, false);
