@@ -301,12 +301,20 @@ async function play(gid, queue) {
     return;
   }
   const song = queue[0];
-  if(song == null || song.url == null){
+  console.log(song);
+  console.log(song.url);
+  if(song == null || song.url || song.url == null){
     console.error("Tried to play undefined song object...");
+    queue.shift();
+    admin.playing.set(gid, false);
+    updateQueue(gid, queue);
     return;
   }
   if(!validURL.validURL(song.url)){
     console.error("Tried to play invalid song object...");
+    queue.shift();
+    admin.playing.set(gid, false);
+    updateQueue(gid, queue);
     return;
   }
   console.log("Now playing: " + song.title);
