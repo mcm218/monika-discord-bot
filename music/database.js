@@ -353,47 +353,55 @@ async function play(gid, queue) {
           setVolume(dispatcher, gid);
         })
         .on("end", reason => {
-          updateTime(gid, -1, -1);
-          fs.unlink("music/song_" + song.id, () => {
-            console.log("Deleted old song file...");
-          });
-          const time = Date.now();
-          const durPlayed = Math.ceil((time - admin.time.get(gid)) / 1000);
+          try{
+              updateTime(gid, -1, -1);
+              fs.unlink("music/song_" + song.id, () => {
+                console.log("Deleted old song file...");
+              });
+              const time = Date.now();
+              const durPlayed = Math.ceil((time - admin.time.get(gid)) / 1000);
 
-          if (reason) console.log(reason);
-          const queue = Object.assign([], admin.queue.get(gid));
-          console.log(song.title + " has ended");
-          const loop = admin.loop.get(gid);
-          const path = "guilds/" + gid + "/VC/queue/songs";
-          if (loop == 1 && reason !== "prev") {
-            // looping the entire queue
-            song.pos = queue.length - 1;
-            queue.push(song);
-          }
-          if (reason !== "skip" && reason !== "prev") {
-            if (loop == 0) {
-              db.collection(path)
-                .doc(song.uid)
-                .delete();
-            }
-            console.log(durPlayed + "/" + admin.duration.get(gid));
-            console.log(
-              Math.floor((100 * durPlayed) / admin.duration.get(gid)) + "%"
-            );
+              if (reason) console.log(reason);
+              const queue = Object.assign([], admin.queue.get(gid));
+              console.log(song.title + " has ended");
+              const loop = admin.loop.get(gid);
+              const path = "guilds/" + gid + "/VC/queue/songs";
+              if (loop == 1 && reason !== "prev") {
+                // looping the entire queue
+                song.pos = queue.length - 1;
+                queue.push(song);
+              }
+              if (reason !== "skip" && reason !== "prev") {
+                if (loop == 0) {
+                  db.collection(path)
+                    .doc(song.uid)
+                    .delete();
+                }
+                console.log(durPlayed + "/" + admin.duration.get(gid));
+                console.log(
+                  Math.floor((100 * durPlayed) / admin.duration.get(gid)) + "%"
+                );
 
-            if (loop != 2) {
-              // not looping the current song
+                if (loop != 2) {
+                  // not looping the current song
+                  queue.shift();
+                  const history = admin.history.get(gid);
+                  history.unshift(song);
+                  updateHistory(gid, history);
+                } else {
+                  console.log("Looping song...");
+                  console.log(queue[0].title);
+                }
+                updateQueue(gid, queue);
+                admin.playing.set(gid, false);
+              }          
+            }catch(error){
+              console.error("play.playFile.end: error: ")
+              console.error(error);
               queue.shift();
-              const history = admin.history.get(gid);
-              history.unshift(song);
-              updateHistory(gid, history);
-            } else {
-              console.log("Looping song...");
-              console.log(queue[0].title);
+              admin.playing.set(gid, false);
+              updateQueue(gid, queue);
             }
-            updateQueue(gid, queue);
-            admin.playing.set(gid, false);
-          }
         })
         .on("error", error => {
           console.log("ERROR PLAYING FILE: \n");
